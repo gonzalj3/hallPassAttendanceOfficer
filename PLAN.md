@@ -9,7 +9,7 @@ Living doc. Update after each phase ships.
   - ✅ 1a: Persistence scaffolding (`d493122`)
   - ✅ 1b: Schools + Students (`110d7d0`)
   - ✅ 1c: Users + Classes + Enrollments + Class Sessions
-- ⏭ **Phase 2** — Attendance core (next)
+- 🔄 **Phase 2** — Attendance core (in progress)
 
 ## All phases
 
@@ -17,7 +17,7 @@ Living doc. Update after each phase ships.
 |---|---|---|---|
 | 0 | TDD harness + bootstrap | ✅ done | pyproject, ruff/mypy, pre-commit gate, CI, docker-compose, CLAUDE.md |
 | 1 | Domain models | ✅ done | Schools, Students, Users, Classes, Enrollments, Class Sessions |
-| 2 | Attendance core | ⏭ | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
+| 2 | Attendance core | 🔄 in progress | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
 | 3 | Hall passes | ⏭ | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
 | 4 | Real-time layer | 🔵 owned by another agent | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
 | 5 | Policy ingestion + rule engine | ⏭ | `policies`, `policy_chunks` (pgvector), `policy_rules`, evaluator, seed rules from TEC + PfISD |

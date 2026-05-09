@@ -3,7 +3,15 @@ from uuid import uuid4
 
 import factory
 
-from hpao.models import Class, ClassEnrollment, ClassSession, School, Student, User
+from hpao.models import (
+    AttendanceRecord,
+    Class,
+    ClassEnrollment,
+    ClassSession,
+    School,
+    Student,
+    User,
+)
 
 
 class SchoolFactory(factory.Factory):  # type: ignore[misc]
@@ -72,3 +80,16 @@ class ClassSessionFactory(factory.Factory):  # type: ignore[misc]
     date = factory.LazyFunction(lambda: date(2025, 9, 4))
     scheduled_start = factory.LazyFunction(lambda: time(9, 0))
     scheduled_end = factory.LazyFunction(lambda: time(9, 50))
+
+
+class AttendanceRecordFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = AttendanceRecord
+
+    id = factory.LazyFunction(uuid4)
+    class_session_id = factory.LazyFunction(uuid4)  # override
+    student_id = factory.LazyFunction(uuid4)  # override
+    status = "PRESENT"
+    source = "TEACHER"
+    recorded_by = None
+    notes = None
