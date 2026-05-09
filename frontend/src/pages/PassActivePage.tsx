@@ -45,7 +45,7 @@ export function PassActivePage() {
     setSelectedDestination,
   } = useApp();
 
-  const [progress, setProgress] = useState(0);
+  const [started, setStarted] = useState(false);
   const [departureTime] = useState(new Date());
   const hasAddedPass = useRef(false);
   const DURATION_MS = 4000;
@@ -67,18 +67,10 @@ export function PassActivePage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Progress bar animation
+  // Trigger CSS transition on next frame so the browser sees 0→100
   useEffect(() => {
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min((elapsed / DURATION_MS) * 100, 100);
-      setProgress(pct);
-      if (pct >= 100) {
-        clearInterval(interval);
-      }
-    }, 50);
-    return () => clearInterval(interval);
+    const raf = requestAnimationFrame(() => setStarted(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Auto-navigate after 4s
@@ -165,10 +157,11 @@ export function PassActivePage() {
         <div className="mb-3">
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full transition-none"
+              className="h-full rounded-full"
               style={{
-                width: `${progress}%`,
+                width: started ? '100%' : '0%',
                 backgroundColor: '#079da8',
+                transition: `width ${DURATION_MS}ms linear`,
               }}
             />
           </div>

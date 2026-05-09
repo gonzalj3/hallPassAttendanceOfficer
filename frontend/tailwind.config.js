@@ -24,7 +24,7 @@ export default {
         background: '#f0f0ea',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Nunito', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '8px',

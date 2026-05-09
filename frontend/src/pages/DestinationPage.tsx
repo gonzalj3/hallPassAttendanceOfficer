@@ -15,7 +15,6 @@ import {
 import { useApp } from '../context/AppContext';
 import { mockStudents } from '../data/mockData';
 import type { Destination } from '../types';
-import { EmergencyLockButton } from '../components/EmergencyLockButton';
 
 interface DestinationCardProps {
   destination: Destination;
@@ -53,7 +52,9 @@ function DestinationCard({
         !disabled
           ? {
               borderColor: isSelected ? '#079da8' : (borderColor ?? '#e5e7eb'),
-              boxShadow: isSelected ? '0 0 0 3px rgba(7,157,168,0.2)' : undefined,
+              boxShadow: isSelected
+                ? '0 0 0 3px rgba(7,157,168,0.2)'
+                : undefined,
             }
           : undefined
       }
@@ -73,20 +74,24 @@ function DestinationCard({
           !disabled && isSelected
             ? { backgroundColor: '#079da8', color: 'white' }
             : !disabled && borderColor
-            ? { backgroundColor: `${borderColor}18`, color: borderColor }
-            : !disabled
-            ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
-            : undefined
+              ? { backgroundColor: `${borderColor}18`, color: borderColor }
+              : !disabled
+                ? { backgroundColor: '#f3f4f6', color: '#6b7280' }
+                : undefined
         }
       >
         {icon}
       </div>
 
       <div className="text-center">
-        <p className={`font-bold text-sm ${disabled ? 'text-gray-400' : 'text-gray-900'}`}>
+        <p
+          className={`font-bold text-sm ${disabled ? 'text-gray-400' : 'text-gray-900'}`}
+        >
           {label}
         </p>
-        <p className={`text-xs mt-0.5 ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>
+        <p
+          className={`text-xs mt-0.5 ${disabled ? 'text-gray-400' : 'text-gray-500'}`}
+        >
           {isFull ? 'Capacity reached for this period' : subtitle}
         </p>
       </div>
@@ -124,48 +129,51 @@ const destinationDefs: Array<{
     label: 'Restroom',
     subtitle: 'Nearest Restroom',
     icon: <Bath size={24} />,
-    isFull: true,
-    borderColor: '#6b7280',
-  },
-  {
-    destination: 'OFFICE',
-    label: 'Office',
-    subtitle: 'Main Office / Guidance',
-    icon: <Building2 size={24} />,
-    borderColor: '#079da8',
-  },
-  {
-    destination: 'NURSE',
-    label: 'Nurse',
-    subtitle: 'Medical Clinic Room 102',
-    icon: <Stethoscope size={24} />,
-    borderColor: '#dc2626',
+    borderColor: '#2563eb', // blue
   },
   {
     destination: 'HALLWAY',
     label: 'Hallway',
     subtitle: 'Water fountain or Locker access',
     icon: <Footprints size={24} />,
-    borderColor: '#079da8',
+    borderColor: '#d97706', // amber
+  },
+  {
+    destination: 'OFFICE',
+    label: 'Office',
+    subtitle: 'Main Office / Guidance',
+    icon: <Building2 size={24} />,
+    borderColor: '#7c3aed', // purple
+  },
+  {
+    destination: 'NURSE',
+    label: 'Nurse',
+    subtitle: 'Medical Clinic Room 102',
+    icon: <Stethoscope size={24} />,
+    borderColor: '#dc2626', // red
   },
   {
     destination: 'CLASSROOM',
     label: 'Classroom',
     subtitle: 'Delivery or Teacher meeting',
     icon: <DoorOpen size={24} />,
-    borderColor: '#079da8',
+    borderColor: '#059669', // green
   },
 ];
 
 export function DestinationPage() {
   const navigate = useNavigate();
   const { studentId } = useParams<{ studentId: string }>();
-  const { selectedStudent, setSelectedStudent, selectedDestination, setSelectedDestination } =
-    useApp();
+  const {
+    selectedStudent,
+    setSelectedStudent,
+    selectedDestination,
+    setSelectedDestination,
+  } = useApp();
 
   const student =
     selectedStudent ??
-    mockStudents.find((s) => s.id === studentId) ??
+    mockStudents.find(s => s.id === studentId) ??
     mockStudents[0];
 
   const firstName = student.name.split(' ')[0];
@@ -182,7 +190,10 @@ export function DestinationPage() {
   };
 
   return (
-    <div className="min-h-screen font-sans" style={{ backgroundColor: '#f0f0ea' }}>
+    <div
+      className="min-h-screen font-sans"
+      style={{ backgroundColor: '#f0f0ea' }}
+    >
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -239,7 +250,7 @@ export function DestinationPage() {
         {/* Destination Grid — 3 on top, 2 on bottom centered */}
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
-            {destinationDefs.slice(0, 3).map((d) => (
+            {destinationDefs.slice(0, 3).map(d => (
               <DestinationCard
                 key={d.destination}
                 {...d}
@@ -249,7 +260,7 @@ export function DestinationPage() {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-4">
-            {destinationDefs.slice(3).map((d) => (
+            {destinationDefs.slice(3).map(d => (
               <DestinationCard
                 key={d.destination}
                 {...d}
@@ -260,11 +271,6 @@ export function DestinationPage() {
             {/* Empty placeholder for grid alignment */}
             <div />
           </div>
-        </div>
-
-        {/* Emergency Lock */}
-        <div className="mt-10 flex justify-center">
-          <EmergencyLockButton variant="pill" />
         </div>
       </main>
     </div>

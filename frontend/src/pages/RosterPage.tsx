@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Settings, Clock, Users, UserCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CheckedOutCard } from '../components/CheckedOutCard';
-import { EmergencyLockButton } from '../components/EmergencyLockButton';
+
 import { inClassStudents, mockClasses } from '../data/mockData';
 import type { Student } from '../types';
 
@@ -35,8 +35,8 @@ export function RosterPage() {
 
   return (
     <div className="min-h-screen font-sans" style={{ backgroundColor: '#f0f0ea' }}>
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
+      {/* Header + Session Info Bar — sticky together */}
+      <div className="sticky top-0 z-10 bg-white shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate('/classes')}
@@ -49,11 +49,10 @@ export function RosterPage() {
             <Settings size={20} />
           </button>
         </div>
-      </header>
 
-      {/* Session Info Bar */}
-      <div className="bg-white border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Session Info Bar */}
+        <div className="border-t border-gray-100">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900">
               {session ? `${session.period}: ${session.name}` : 'Period 3: Biology'}
@@ -76,6 +75,7 @@ export function RosterPage() {
               {activePasses_.length} Checked Out
             </span>
           </div>
+        </div>
         </div>
       </div>
 
@@ -129,17 +129,17 @@ export function RosterPage() {
           </div>
         </section>
 
-        {/* Guest Check-In */}
-        <section>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-600 mb-3">
-            Guest Check-In
-          </h2>
-          <form onSubmit={handleGuestCheckIn} className="flex gap-2 max-w-md">
+      </main>
+
+      {/* Guest Check-In - fixed bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 p-3 bg-white border-t border-gray-100 sm:p-4">
+        <div className="max-w-5xl mx-auto">
+          <form onSubmit={handleGuestCheckIn} className="flex gap-2">
             <input
               type="text"
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
-              placeholder="Student Name or ID..."
+              placeholder="Guest student name or ID..."
               className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none min-h-[44px]"
               onFocus={(e) => {
                 e.currentTarget.style.borderColor = '#079da8';
@@ -160,13 +160,6 @@ export function RosterPage() {
               Check In
             </button>
           </form>
-        </section>
-      </main>
-
-      {/* Emergency Lock - fixed bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 p-3 bg-white border-t border-gray-100 sm:p-4">
-        <div className="max-w-5xl mx-auto">
-          <EmergencyLockButton variant="full-width" />
         </div>
       </div>
     </div>

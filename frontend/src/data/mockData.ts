@@ -88,36 +88,163 @@ export const mockClasses: ClassPeriod[] = [
 ];
 
 export const mockStudents: Student[] = [
-  { id: 'student-1', name: 'Sarah Jenkins', studentNumber: 'S001', gradeLevel: 10 },
-  { id: 'student-2', name: 'Liam Wilson', studentNumber: 'S002', gradeLevel: 10 },
-  { id: 'student-3', name: 'Elena Rodriguez', studentNumber: 'S003', gradeLevel: 10 },
+  {
+    id: 'student-1',
+    name: 'Sarah Jenkins',
+    studentNumber: 'S001',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-2',
+    name: 'Liam Wilson',
+    studentNumber: 'S002',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-3',
+    name: 'Elena Rodriguez',
+    studentNumber: 'S003',
+    gradeLevel: 10,
+  },
   { id: 'student-4', name: 'David Kim', studentNumber: 'S004', gradeLevel: 10 },
-  { id: 'student-5', name: 'Jordan Smith', studentNumber: 'S005', gradeLevel: 10 },
-  { id: 'student-6', name: 'Maya Patel', studentNumber: 'S006', gradeLevel: 10 },
-  { id: 'student-7', name: 'Oliver Thompson', studentNumber: 'S007', gradeLevel: 10 },
-  { id: 'student-8', name: 'Sophia Garcia', studentNumber: 'S008', gradeLevel: 10 },
-  { id: 'student-9', name: 'Lucas Brown', studentNumber: 'S009', gradeLevel: 10 },
-  { id: 'student-10', name: 'Isabella Martinez', studentNumber: 'S010', gradeLevel: 10 },
-  { id: 'student-11', name: 'Noah Johnson', studentNumber: 'S011', gradeLevel: 10 },
-  { id: 'student-12', name: 'Mia Williams', studentNumber: 'S012', gradeLevel: 10 },
-  { id: 'student-13', name: 'Ethan Davis', studentNumber: 'S013', gradeLevel: 10 },
-  { id: 'student-14', name: 'Ava Brown', studentNumber: 'S014', gradeLevel: 10 },
-  { id: 'student-15', name: 'James Miller', studentNumber: 'S015', gradeLevel: 10 },
-  { id: 'student-16', name: 'Charlotte Wilson', studentNumber: 'S016', gradeLevel: 10 },
-  { id: 'student-17', name: 'Benjamin Moore', studentNumber: 'S017', gradeLevel: 10 },
-  { id: 'student-18', name: 'Amelia Taylor', studentNumber: 'S018', gradeLevel: 10 },
-  { id: 'student-19', name: 'William Anderson', studentNumber: 'S019', gradeLevel: 10 },
-  { id: 'student-20', name: 'Harper Thomas', studentNumber: 'S020', gradeLevel: 10 },
-  { id: 'student-21', name: 'Alexander Jackson', studentNumber: 'S021', gradeLevel: 10 },
-  // Checked-out students
-  { id: 'student-22', name: 'Marcus Chen', studentNumber: 'S022', gradeLevel: 10 },
-  { id: 'student-23', name: 'Amara Okafor', studentNumber: 'S023', gradeLevel: 10 },
-  { id: 'student-24', name: 'Chloe Zhang', studentNumber: 'S024', gradeLevel: 10 },
+  {
+    id: 'student-5',
+    name: 'Jordan Smith',
+    studentNumber: 'S005',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-6',
+    name: 'Maya Patel',
+    studentNumber: 'S006',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-7',
+    name: 'Oliver Thompson',
+    studentNumber: 'S007',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-8',
+    name: 'Sophia Garcia',
+    studentNumber: 'S008',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-9',
+    name: 'Lucas Brown',
+    studentNumber: 'S009',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-10',
+    name: 'Isabella Martinez',
+    studentNumber: 'S010',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-11',
+    name: 'Noah Johnson',
+    studentNumber: 'S011',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-12',
+    name: 'Mia Williams',
+    studentNumber: 'S012',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-13',
+    name: 'Ethan Davis',
+    studentNumber: 'S013',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-14',
+    name: 'Ava Brown',
+    studentNumber: 'S014',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-15',
+    name: 'James Miller',
+    studentNumber: 'S015',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-16',
+    name: 'Charlotte Wilson',
+    studentNumber: 'S016',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-17',
+    name: 'Benjamin Moore',
+    studentNumber: 'S017',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-18',
+    name: 'Amelia Taylor',
+    studentNumber: 'S018',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-19',
+    name: 'William Anderson',
+    studentNumber: 'S019',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-20',
+    name: 'Harper Thomas',
+    studentNumber: 'S020',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-21',
+    name: 'Alexander Jackson',
+    studentNumber: 'S021',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-22',
+    name: 'Avery Johnson',
+    studentNumber: 'S022',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-23',
+    name: 'Amara Okafor',
+    studentNumber: 'S023',
+    gradeLevel: 10,
+  },
+  {
+    id: 'student-24',
+    name: 'Chloe Zhang',
+    studentNumber: 'S024',
+    gradeLevel: 10,
+  },
 ];
 
 export const inClassStudents = mockStudents.slice(0, 21);
 export const checkedOutStudentIds = ['student-22', 'student-23', 'student-24'];
 
 export const createInitialHallPasses = (): HallPass[] => {
-  return [];
+  const now = new Date();
+  return [
+    {
+      id: 'pass-1',
+      studentId: 'student-22',
+      studentName: 'Avery Johnson',
+      destination: 'NURSE',
+      checkedOutAt: new Date(now.getTime() - 6 * 60 * 1000),
+      expectedReturnAt: new Date(
+        now.getTime() - 6 * 60 * 1000 + 15 * 60 * 1000,
+      ),
+      status: 'ACTIVE',
+    },
+  ];
 };
