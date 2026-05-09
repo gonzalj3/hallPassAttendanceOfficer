@@ -2,11 +2,10 @@ import asyncio
 import contextlib
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # Import Base and all models so target_metadata is fully populated.
 from hpao import models  # noqa: F401  (registers tables on Base.metadata)

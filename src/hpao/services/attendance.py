@@ -62,7 +62,11 @@ async def record_attendance(
         },
     ).returning(AttendanceRecord)
 
-    result = await db.execute(upsert_stmt)
+    # populate_existing forces SQLAlchemy to refresh any instance already in
+    # the session's identity map with the values from RETURNING. Without this,
+    # a second call with a different status would return a cached instance
+    # holding the old status even though the DB row was updated.
+    result = await db.execute(upsert_stmt, execution_options={"populate_existing": True})
     record = result.scalar_one()
     await db.flush()
     return record

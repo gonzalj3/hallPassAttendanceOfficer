@@ -2,11 +2,10 @@ from collections.abc import AsyncIterator, Iterator
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
-from testcontainers.postgres import PostgresContainer
-
 from alembic import command
 from alembic.config import Config
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from testcontainers.postgres import PostgresContainer
 
 
 def _docker_available() -> bool:
