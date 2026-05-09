@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     parent_comms_secret: str | None = Field(default=None)
     dispatcher_interval_seconds: float = Field(default=30.0)
 
+    # OpenAI / Codex hackathon credentials (Phase 5c embeddings + Phase 7
+    # agent loop). Tests inject a stub Embedder so OPENAI_API_KEY is only
+    # required at runtime when an OpenAI-backed component actually runs.
+    openai_api_key: str | None = Field(default=None)
+    openai_project_id: str | None = Field(default=None)
+    openai_model: str = Field(default="gpt-4o-mini")
+    openai_embedding_model: str = Field(default="text-embedding-3-small")
+
 
 @lru_cache
 def get_settings() -> Settings:
