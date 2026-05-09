@@ -10,7 +10,9 @@ Living doc. Update after each phase ships.
   - ✅ 1b: Schools + Students (`110d7d0`)
   - ✅ 1c: Users + Classes + Enrollments + Class Sessions
 - ✅ **Phase 2** — Attendance core (complete)
-- 🔄 **Phase 3** — Hall passes (in progress)
+- ✅ **Phase 3** — Hall passes (complete)
+- ⏭ **Phase 4** — Real-time layer (owned by other agent; 4a + 4b + 4c shipped)
+- ⏭ **Phase 5** — Policy ingestion + rule engine (next for me)
 
 ## All phases
 
@@ -19,8 +21,8 @@ Living doc. Update after each phase ships.
 | 0 | TDD harness + bootstrap | ✅ done | pyproject, ruff/mypy, pre-commit gate, CI, docker-compose, CLAUDE.md |
 | 1 | Domain models | ✅ done | Schools, Students, Users, Classes, Enrollments, Class Sessions |
 | 2 | Attendance core | 🔄 in progress | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
-| 3 | Hall passes | 🔄 in progress | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
-| 4 | Real-time layer | 🔵 owned by another agent | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
+| 3 | Hall passes | ✅ done | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
+| 4 | Real-time layer | ✅ done (other agent) | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
 | 5 | Policy ingestion + rule engine | ⏭ | `policies`, `policy_chunks` (pgvector), `policy_rules`, evaluator, seed rules from TEC + PfISD |
 | 6 | Alerts + threshold detection | ⏭ | `alerts`, triggers (write + overdue + nightly), 15-min restroom rule wired to on-duty admin |
 | 7 | Agent layer | ⏭ | OpenAI Codex agent loop + tool surface (attendance, hallpass, rules, policy, alert, relay) |
