@@ -18,6 +18,7 @@ Living doc. Update after each phase ships.
 - ✅ **Phase 5c** — Policy embedding pipeline + pgvector RAG search (other agent)
 - ✅ **Phase 8** — Inter-agent boundary endpoints (complete)
 - ✅ **Demo wire-up** — Periodic dispatcher loop tying `detect_overdue_passes` to `dispatch_alert`
+- ✅ **Phase 7** — OpenAI Codex agent loop wrapping the tool surface
 
 ## Demo runbook
 
@@ -53,7 +54,7 @@ dev when the parent-comms agent isn't up.
 | 4 | Real-time layer | ✅ done (other agent) | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
 | 5 | Policy ingestion + rule engine | ✅ done (other agent) | `policies`, `policy_chunks` (pgvector), `policy_rules`, evaluator, embedding pipeline, RAG search |
 | 6 | Alerts + threshold detection | ✅ done | `alerts`, raise/ack/resolve, partial unique on OPEN per (student, rule), 15-min restroom detect_overdue_passes wired |
-| 7 | Agent layer | ⏭ | OpenAI Codex agent loop + tool surface (attendance, hallpass, rules, policy, alert, relay) |
+| 7 | Agent layer | ✅ done | OpenAI Agents SDK loop + 8-tool surface (attendance, hallpass, alerts, policy, dispatch). CLI: `python -m hpao.cli.agent "..."` |
 | 8 | Inter-agent boundary | ✅ done | REST endpoints + HMAC-signed outbound webhook to parent-comms agent |
 | 9 | Audit + observability | ⏭ | `audit_log`, structured logging, LLM token budget + circuit breaker |
 

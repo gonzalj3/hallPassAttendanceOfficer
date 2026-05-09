@@ -98,6 +98,18 @@ The signed payload that lands at the teammate's `/notifications`:
 
 Header: `X-HPAO-Signature: hex(hmac_sha256(PARENT_COMMS_SECRET, raw_body))`.
 
+### Talking to the OpenAI agent ad-hoc
+
+For investigating student state via an LLM (Phase 7):
+
+```bash
+OPENAI_API_KEY=... \
+DATABASE_URL=... \
+  python -m hpao.cli.agent "How many days has student S00042 been absent this semester?"
+```
+
+The agent has tools for: `lookup_student_by_number`, `get_student_attendance`, `get_active_hall_pass`, `get_open_alerts_for_student`, `query_policy`, `record_attendance_as_agent`, `raise_alert_for_student`, `dispatch_pending_alerts`. It will call them and respond with a terse staff-facing summary.
+
 ## What HPAO is (and isn't)
 
 - **Owns**: schools, classes, students, teachers, attendance, hall passes, policy rules, alerts, agent-message log.
