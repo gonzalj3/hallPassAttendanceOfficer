@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-4o-mini")
     openai_embedding_model: str = Field(default="text-embedding-3-small")
 
+    # CORS allow-list for the deployed frontend. Override per-deploy:
+    # multiple origins can be comma-separated. Localhost dev URLs are
+    # always allowed via a regex regardless of this setting.
+    frontend_origin: str = Field(default="https://verdant-pie-1d3c9f.netlify.app")
+
 
 @lru_cache
 def get_settings() -> Settings:

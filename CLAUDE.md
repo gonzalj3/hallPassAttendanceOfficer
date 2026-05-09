@@ -44,8 +44,27 @@ Required env (or `.env`):
 | `OPENAI_PROJECT_ID` | no | unset | Optional — pins API calls to a specific OpenAI project |
 | `OPENAI_MODEL` | no | `gpt-4o-mini` | Default chat model for the agent loop |
 | `OPENAI_EMBEDDING_MODEL` | no | `text-embedding-3-small` | Used by Phase 5c policy chunk embedding |
+| `FRONTEND_ORIGIN` | no | the deployed Netlify URL | CORS allow-list for the API. Comma-separate multiple origins. `http://localhost:*` is always allowed for dev. |
 
 If `PARENT_COMMS_URL` / `_SECRET` are unset, the dispatcher still runs `detect_overdue_passes` (state hygiene) but skips outbound webhooks — useful when the teammate's agent isn't up.
+
+## Run the API locally (for the frontend)
+
+```bash
+make db-up                                   # Postgres 16 + pgvector
+.venv/bin/alembic upgrade head               # schema
+.venv/bin/uvicorn --factory hpao.app:app_factory --reload --port 8000
+```
+
+The app exposes:
+- `GET  /healthz`                       — liveness
+- `GET  /openapi.json` · `/docs`        — Swagger UI
+- `WS   /v1/realtime?channel=…`         — Phase 4c fan-out
+- `POST /v1/agent/inbound/parent-message` (HMAC) — Phase 8 inter-agent
+- `POST /v1/agent/inbound/parent-response` (HMAC)
+- `GET  /v1/agent/student-context/{id}` (HMAC)
+
+CORS: `FRONTEND_ORIGIN` (defaults to the deployed Netlify URL) plus any `http://localhost:*` are allowed for browsers.
 
 ## Demo runbook (the 15-min restroom flow, end-to-end)
 
