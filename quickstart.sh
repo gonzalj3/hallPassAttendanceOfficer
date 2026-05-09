@@ -119,10 +119,14 @@ BACKEND_AVAILABLE=0
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   # cd into ROOT_DIR so docker compose auto-loads docker-compose.override.yml
   # if the dev has one (gitignored, used to dodge host-port collisions).
-  (cd "$ROOT_DIR" && docker compose up -d db)
+  # `--wait` blocks until the db's healthcheck passes so alembic doesn't
+  # race the still-initializing Postgres process on a cold first run.
+  (cd "$ROOT_DIR" && docker compose up -d --wait db)
   (cd "$ROOT_DIR" && "$VENV_DIR/bin/alembic" -c "$ROOT_DIR/alembic.ini" upgrade head)
   printf 'Seeding demo school + classes + students (idempotent)...\n'
   (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m hpao.cli.seed)
+  printf 'Seeding Avery Johnson + 14 hall-pass history (idempotent)...\n'
+  (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m hpao.cli.seed_avery)
   BACKEND_AVAILABLE=1
 else
   printf 'Docker is not running; skipping local Postgres + ABE backend startup. The Teacher Dashboard / Hall Pass iPad will fail their first /api/sessions fetch until you start Docker and re-run.\n'
