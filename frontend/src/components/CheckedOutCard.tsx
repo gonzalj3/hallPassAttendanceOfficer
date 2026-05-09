@@ -78,7 +78,7 @@ export function CheckedOutCard({ pass, onChange }: CheckedOutCardProps) {
       </div>
 
       <div
-        className={`text-3xl font-mono font-bold tabular-nums ${
+        className={`text-3xl font-sans font-bold tabular-nums ${
           isOverdue ? 'text-emergency' : 'text-gray-800'
         }`}
       >
