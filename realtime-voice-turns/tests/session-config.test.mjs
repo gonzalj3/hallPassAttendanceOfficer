@@ -67,6 +67,22 @@ test("session config requires the exact bilingual Abe opening", () => {
   assert.match(config.instructions, /language spoken by the person/i);
 });
 
+test("session config hardens short yes no language detection", () => {
+  const config = buildSessionConfig({
+    parent_name: "Morgan Johnson",
+    guardian_language: "Spanish",
+    student_name: "Avery Johnson"
+  });
+
+  assert.match(config.instructions, /Language Selection/i);
+  assert.match(config.instructions, /Guardian preferred language from the datastore: Spanish/);
+  assert.match(config.instructions, /yes.*English/i);
+  assert.match(config.instructions, /s[ií].*Spanish/i);
+  assert.match(config.instructions, /single-word "no"/i);
+  assert.match(config.instructions, /tie-breaker/i);
+  assert.match(config.instructions, /¿Prefiere inglés o español\?/i);
+});
+
 test("session config exposes a structured excuse submission tool", () => {
   const config = buildSessionConfig();
   const tool = config.tools.find((candidate) => candidate.name === "submit_attendance_excuse");

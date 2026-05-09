@@ -52,6 +52,7 @@ const callScenarios = {
 
 function buildInitialCallInstructions(scenario = activeScenario) {
   const guardianName = activeCase?.parent_name ?? "the parent or guardian";
+  const preferredLanguage = activeCase?.guardian_language ?? "unknown";
   const scenarioConfig = callScenarios[scenario] ?? callScenarios.absentee;
   const issueSentence = scenarioConfig.issueSentence(activeCase);
 
@@ -61,7 +62,10 @@ function buildInitialCallInstructions(scenario = activeScenario) {
     "Do not substitute a different attendance issue.",
     `First say exactly: "Hello this is Abe calling from the Austin High School. Is this ${guardianName}?"`,
     "Then immediately repeat the same opening statement in Spanish.",
-    "After the person confirms they are the guardian, continue in the language spoken by the person who responds.",
+    `The datastore preferred language is ${preferredLanguage}; use it only as a tie-breaker for ambiguous one-word replies.`,
+    'If the guardian says "yes", continue in English. If the guardian says "sí" or "si", continue in Spanish. If the guardian only says "no", use the datastore preferred language as the language tie-breaker while handling the negative answer appropriately.',
+    'If you still cannot tell the preferred language, ask once: "Would you prefer English or Spanish? ¿Prefiere inglés o español?"',
+    "After the person confirms they are the guardian, continue in the selected language.",
     `Then say exactly: "${issueSentence}"`
   ].join(" ");
 }

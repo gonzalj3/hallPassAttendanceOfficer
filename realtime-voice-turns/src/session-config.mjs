@@ -3,6 +3,7 @@ export const REALTIME_MODEL = "gpt-realtime-2";
 function buildAttendanceInstructions(caseData = {}) {
   const studentName = caseData.student_name ?? "the student";
   const parentName = caseData.parent_name ?? "the parent or guardian";
+  const guardianLanguage = caseData.guardian_language ?? "unknown";
   const absencesThisYear = caseData.absences_this_year ?? "the recorded";
   const policyText =
     caseData.policy_text ?? "Students can miss no more than 10 days in a school year.";
@@ -29,6 +30,15 @@ function buildAttendanceInstructions(caseData = {}) {
     "If the parent says there is no excuse, call submit_attendance_excuse with stated_reason set to no excuse provided and parent_confirmed set to true.",
     "After submit_attendance_excuse returns, briefly tell the parent the result and end politely.",
     "Do not ask extra follow-up questions unless the audio is unclear or the parent did not answer the question.",
+    "",
+    "# Language Selection",
+    `Guardian preferred language from the datastore: ${guardianLanguage}.`,
+    'If the guardian response is "yes", continue in English.',
+    'If the guardian response is "sí", "si", "claro", or another Spanish acknowledgement, continue in Spanish.',
+    'Treat a single-word "no" as ambiguous for language because it can be English or Spanish; use the datastore preferred language as the tie-breaker when available.',
+    'If a short response is unclear and there is no datastore tie-breaker, ask once: "Would you prefer English or Spanish? ¿Prefiere inglés o español?"',
+    "If the guardian later speaks a different language, switch immediately to that language.",
+    "When calling submit_attendance_excuse, set language to the language used for the substantive reason, not merely the bilingual opening.",
     "",
     "# Turn Taking",
     "Wait until the parent has finished speaking before responding.",

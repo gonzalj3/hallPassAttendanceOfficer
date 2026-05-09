@@ -73,6 +73,10 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(app, /Start Absentee Call/);
   assert.match(app, /Start Hall Pass Call/);
   assert.match(app, /Do not substitute a different attendance issue/);
+  assert.match(app, /use it only as a tie-breaker for ambiguous one-word replies/);
+  assert.match(app, /If the guardian says "yes", continue in English/);
+  assert.match(app, /If the guardian says "sí" or "si", continue in Spanish/);
+  assert.match(app, /Would you prefer English or Spanish\? ¿Prefiere inglés o español\?/);
   assert.match(app, /Data Saved/);
   assert.doesNotMatch(app, /data\/output\/conversations\.csv/);
   assert.doesNotMatch(app, /Realtime session created/);
