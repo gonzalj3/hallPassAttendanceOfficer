@@ -19,7 +19,7 @@ Living doc. Update after each phase ships.
 | 1 | Domain models | ✅ done | Schools, Students, Users, Classes, Enrollments, Class Sessions |
 | 2 | Attendance core | ⏭ | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
 | 3 | Hall passes | ⏭ | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
-| 4 | Real-time layer | ⏭ | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
+| 4 | Real-time layer | 🔵 owned by another agent | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
 | 5 | Policy ingestion + rule engine | ⏭ | `policies`, `policy_chunks` (pgvector), `policy_rules`, evaluator, seed rules from TEC + PfISD |
 | 6 | Alerts + threshold detection | ⏭ | `alerts`, triggers (write + overdue + nightly), 15-min restroom rule wired to on-duty admin |
 | 7 | Agent layer | ⏭ | OpenAI Codex agent loop + tool surface (attendance, hallpass, rules, policy, alert, relay) |
@@ -41,6 +41,13 @@ Phase 5 (policy RAG) and Phase 7 (full agent loop) elevate it from demo to produ
 Phase 4 (real-time) is intentionally early — both rules engine and agent emit events through it, so getting the channel + WebSocket plumbing right pays compounding interest.
 
 Phase 9 is post-hackathon unless judges care about audit trails.
+
+## Ownership
+
+- **🔵 Phase 4 (real-time)** is being implemented by a separate coding agent in parallel. This repo is shared.
+- The seam stays clean by design: Phases 2 / 3 / 6 just write to the DB; the Phase 4 layer reads those writes via `LISTEN/NOTIFY` triggers and fans them out. No code-level coupling between the agents.
+- Pull/fetch before every push to integrate the other agent's work.
+- Don't edit `src/hpao/realtime/`, NOTIFY trigger migrations, or WebSocket endpoints — those belong to the other agent.
 
 ## Conventions (followed per phase)
 
