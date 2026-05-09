@@ -17,6 +17,30 @@ Living doc. Update after each phase ships.
 - ✅ **Phase 5b** — Rule expression evaluator + idempotent seed (other agent)
 - ✅ **Phase 5c** — Policy embedding pipeline + pgvector RAG search (other agent)
 - ✅ **Phase 8** — Inter-agent boundary endpoints (complete)
+- ✅ **Demo wire-up** — Periodic dispatcher loop tying `detect_overdue_passes` to `dispatch_alert`
+
+## Demo runbook
+
+To run the headline 15-min restroom flow end-to-end locally:
+
+1. `make db-up` — start Postgres (pgvector image)
+2. `make install` — venv + deps + pre-commit hooks
+3. Set env: `DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5432/hpao`,
+   `PARENT_COMMS_URL=https://your-teammate-agent.example`,
+   `PARENT_COMMS_SECRET=<shared HMAC secret>`,
+   `DISPATCHER_INTERVAL_SECONDS=5` (so the demo doesn't take 30s per tick)
+4. `.venv/bin/alembic upgrade head` — apply migrations
+5. `python -m hpao.cli.dispatcher` — start the dispatcher loop in one terminal
+6. In another terminal, issue a hall pass via the service or insert a test row, then wait
+   the 15 minutes (or use a short `duration_minutes=1` on the pass for the demo)
+7. Watch the dispatcher log — within `DISPATCHER_INTERVAL_SECONDS` of the pass going overdue,
+   the pass flips to `OVERDUE`, an alert is raised, and a signed POST hits parent-comms
+
+For a single iteration without the loop: `python -m hpao.cli.dispatcher --once`.
+
+Without `PARENT_COMMS_URL` / `PARENT_COMMS_SECRET` set, the dispatcher still runs
+`detect_overdue_passes` for state hygiene but skips outbound webhooks — useful for local
+dev when the parent-comms agent isn't up.
 
 ## All phases
 
