@@ -1,0 +1,3 @@
+timestamp,call_id,student_id,student_name,parent_name,absences_this_year,speaker,transcript
+2026-05-09T17:45:02.540Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"Okay, starting the attendance call now. Let’s get the key details sorted together."
+2026-05-09T17:45:02.540Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"First, please tell me the student’s name, the absence date or dates in year-month-day format, and the parent or guardian’s explanation for the absence. Then I’ll read a brief summary back for their confirmation before submitting it."
