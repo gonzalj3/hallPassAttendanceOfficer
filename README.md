@@ -77,10 +77,11 @@ chmod +x quickstart.sh
 ./quickstart.sh
 ```
 
-The script installs the backend/core Python package, starts local Postgres when Docker is available, installs the Teacher Dashboard / Hall Pass iPad frontend, installs the Outbound Voice Agent, starts both local web servers, and opens:
+The script installs the backend/core Python package, starts local Postgres when Docker is available, runs alembic migrations, seeds a demo school + classes + students, brings up the ABE backend (FastAPI) on `:8000`, installs the Teacher Dashboard / Hall Pass iPad frontend, installs the Outbound Voice Agent, starts both local web servers wired against the backend (`VITE_API_URL=http://localhost:8000`), and opens:
 
 - Teacher Dashboard: `http://localhost:3000/classes`
-- Hall Pass iPad: `http://localhost:3000/roster/session-3`
+- Hall Pass iPad:    `http://localhost:3000/classes` (same app — pick a class, then a student)
+- ABE backend Swagger: `http://localhost:8000/docs`
 - Outbound Voice Agent: `http://localhost:5178`
 
 ## Demo Flow
@@ -112,7 +113,7 @@ SAFETY_IDENTIFIER=outbound-voice-agent-local
 
 - **Outbound Voice Agent**: Node.js 20+ ESM HTTP server using built-in `node:http`, browser WebRTC audio, plain HTML/CSS/JavaScript, OpenAI Realtime API with `gpt-realtime-2`, `gpt-4o-transcribe`, semantic VAD turn detection, and Realtime function calling.
 - **Voice Demo Datastore**: CSV fixtures and outputs under `outbound-voice-agent/data`, with local endpoints for case loading, transcript logging, and confirmed excuse recording.
-- **Teacher Dashboard / Hall Pass iPad**: React 18, TypeScript, Vite 5, React Router, Tailwind CSS, and lucide-react. The current frontend uses local mock data.
+- **Teacher Dashboard / Hall Pass iPad**: React 18, TypeScript, Vite 5, React Router, Tailwind CSS, and lucide-react. The frontend calls the ABE backend over `/api/*` for class lists, rosters, and hall-pass state, and subscribes to `/v1/realtime` over WebSocket for live updates.
 - **ABE Core Backend**: Python 3.12 package with FastAPI, Pydantic v2, Pydantic Settings, SQLAlchemy 2 async, asyncpg, Alembic migrations, PostgreSQL 16, and pgvector.
 - **Policy And Logic Layer**: Python services for attendance, hall passes, alerts, policy rules, policy ingestion/search, and realtime event publishing.
 - **Local Infrastructure**: Docker Compose starts `pgvector/pgvector:pg16`; `quickstart.sh` prepares the Python venv, installs Node apps, starts demo servers, and opens the three local demo URLs.
@@ -122,21 +123,21 @@ SAFETY_IDENTIFIER=outbound-voice-agent-local
 
 ### Teacher Dashboard
 
-The Teacher Dashboard is part of the React/Vite frontend in `frontend/`. It uses React Router to move from login to class selection to a roster view. For the demo, the dashboard reads local mock classes and students from `frontend/src/data/mockData.ts`. Teachers can view the current class, see in-class and checked-out counts, tap student roster entries, and move into the hall-pass flow.
+The Teacher Dashboard is part of the React/Vite frontend in `frontend/`. It uses React Router to move from login to class selection to a roster view. The dashboard reads class sessions and rosters from the ABE backend (`GET /api/sessions`, `GET /api/sessions/{id}/students`) and opens a WebSocket against `/v1/realtime` so newly issued or returned passes refetch live without a manual reload. Teachers can view the current class, see in-class and checked-out counts, tap student roster entries, and move into the hall-pass flow.
 
 Demo URL: `http://localhost:3000/classes`
 
 ### Hall Pass iPad App
 
-The Hall Pass iPad app is the same frontend app, shown at a student-facing route. A student is selected from the roster, chooses a destination, and sees an active pass screen. The demo keeps this state in React context rather than a remote API, so it is fast and inspectable for the hackathon flow. In the full architecture, these start/return events become canonical ABE events and feed policy analysis.
+The Hall Pass iPad app is the same frontend app, shown at a student-facing route. A student is selected from the roster, chooses a destination, and sees an active pass screen. Issuing the pass calls `POST /api/hall-passes` against the ABE backend; checking back in calls `POST /api/hall-passes/{id}/return`. The class session's WebSocket subscription means a pass issued from one device shows up on every other dashboard pointed at the same class within milliseconds.
 
-Demo URL: `http://localhost:3000/roster/session-3`
+Demo URL: open the Teacher Dashboard at `http://localhost:3000/classes`, pick a class, then tap a student.
 
 ### ABE Core Data, Logic, And Policy
 
 The ABE core backend lives under `src/hpao/`. It defines the durable domain model for schools, students, users, classes, class sessions, attendance records, hall passes, policies, and alerts. SQLAlchemy models and Alembic migrations target PostgreSQL with pgvector. Service modules implement attendance recording, hall-pass issue/return behavior, alert detection, and policy/rule evaluation. The realtime package publishes and serves event streams for dashboard-style consumers.
 
-During the hackathon demo, the frontend and outbound voice agent use mock data rather than fully wiring every browser action through the backend. The backend is present as the production-shaped core that ABE would use as the canonical datastore and policy engine.
+During the hackathon demo, the frontend drives the backend directly: every class lookup, roster fetch, and hall-pass action is a real database write through the FastAPI `/api/*` surface. The outbound voice agent still runs against its own CSV fixtures rather than the shared backend — joining those two stores is a post-hackathon item.
 
 ### Outbound Voice Agent
 

@@ -26,10 +26,15 @@ set +a
 
 VOICE_PORT="${PORT:-5178}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
 OPENAI_API_KEY_VALUE="${OPENAI_API_KEY:-}"
 DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://hpao:hpao@localhost:5432/hpao}"
 SAFETY_IDENTIFIER="${SAFETY_IDENTIFIER:-outbound-voice-agent-local}"
-export DATABASE_URL PORT FRONTEND_PORT SAFETY_IDENTIFIER
+# VITE_API_URL is read by the React frontend at build/dev time; defaults
+# to the backend port we just decided on. WS URL is auto-derived in
+# frontend/src/api/realtime.ts (http -> ws), so it doesn't need to be set.
+VITE_API_URL="${VITE_API_URL:-http://localhost:${BACKEND_PORT}}"
+export DATABASE_URL PORT FRONTEND_PORT SAFETY_IDENTIFIER VITE_API_URL
 
 if [[ -z "$OPENAI_API_KEY_VALUE" || "$OPENAI_API_KEY_VALUE" == "sk-your-api-key" ]]; then
   cat <<MSG
@@ -110,11 +115,15 @@ fi
 "$VENV_DIR/bin/python" -m pip install --upgrade pip >/dev/null
 "$VENV_DIR/bin/python" -m pip install -e "$ROOT_DIR[dev]" >/dev/null
 
+BACKEND_AVAILABLE=0
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   docker compose -f "$ROOT_DIR/docker-compose.yml" up -d db
   (cd "$ROOT_DIR" && "$VENV_DIR/bin/alembic" -c "$ROOT_DIR/alembic.ini" upgrade head)
+  printf 'Seeding demo school + classes + students (idempotent)...\n'
+  (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m hpao.cli.seed)
+  BACKEND_AVAILABLE=1
 else
-  printf 'Docker is not running; skipping local Postgres startup. UI and voice demos still run with mock data.\n'
+  printf 'Docker is not running; skipping local Postgres + ABE backend startup. The Teacher Dashboard / Hall Pass iPad will fail their first /api/sessions fetch until you start Docker and re-run.\n'
 fi
 
 printf 'Installing Teacher Dashboard / Hall Pass iPad dependencies...\n'
@@ -122,6 +131,13 @@ npm_install_app "$FRONTEND_DIR" "Teacher Dashboard / Hall Pass iPad"
 
 printf 'Installing Outbound Voice Agent dependencies...\n'
 npm_install_app "$VOICE_DIR" "Outbound Voice Agent"
+
+if [[ $BACKEND_AVAILABLE -eq 1 ]]; then
+  printf 'Starting ABE backend (uvicorn) on port %s...\n' "$BACKEND_PORT"
+  (cd "$ROOT_DIR" && "$VENV_DIR/bin/uvicorn" --factory hpao.app:app_factory \
+    --host 127.0.0.1 --port "$BACKEND_PORT") &
+  PIDS+=("$!")
+fi
 
 printf 'Starting Teacher Dashboard and Hall Pass iPad app...\n'
 npm --prefix "$FRONTEND_DIR" run dev -- --host 127.0.0.1 --port "$FRONTEND_PORT" &
@@ -132,9 +148,13 @@ npm --prefix "$VOICE_DIR" start &
 PIDS+=("$!")
 
 TEACHER_DASHBOARD_URL="http://localhost:${FRONTEND_PORT}/classes"
-IPAD_APP_URL="http://localhost:${FRONTEND_PORT}/roster/session-3"
+IPAD_APP_URL="http://localhost:${FRONTEND_PORT}/classes"
 OUTBOUND_VOICE_AGENT_URL="http://localhost:${VOICE_PORT}"
+BACKEND_HEALTHZ_URL="http://localhost:${BACKEND_PORT}/healthz"
 
+if [[ $BACKEND_AVAILABLE -eq 1 ]]; then
+  wait_for_url "$BACKEND_HEALTHZ_URL" "ABE backend"
+fi
 wait_for_url "http://localhost:${FRONTEND_PORT}" "Teacher Dashboard / Hall Pass iPad"
 wait_for_url "$OUTBOUND_VOICE_AGENT_URL" "Outbound Voice Agent"
 
