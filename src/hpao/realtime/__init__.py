@@ -1,14 +1,13 @@
-"""Realtime layer: event taxonomy + pub/sub abstractions.
+"""Realtime layer: event taxonomy, pub/sub abstractions, WebSocket fan-out.
 
-Phase 4a defined the contract: `RealtimeEvent` discriminated union, the
-`channels_for()` school/class/student fan-out, and a `RealtimePublisher`
-Protocol with an in-memory implementation.
-
-Phase 4b adds the Postgres LISTEN/NOTIFY transport (`PgNotifyPublisher`,
-`RealtimeListener`). Phase 4c will plug a WebSocket endpoint into the
-listener.
+- Phase 4a: `RealtimeEvent` discriminated union, `channels_for()`,
+  `RealtimePublisher` Protocol, `InMemoryPublisher`.
+- Phase 4b: Postgres LISTEN/NOTIFY transport (`PgNotifyPublisher`,
+  `RealtimeListener`).
+- Phase 4c: FastAPI WebSocket endpoint and `make_app()` factory.
 """
 
+from hpao.realtime.app import make_app
 from hpao.realtime.events import (
     AlertRaised,
     AttendanceRecorded,
@@ -27,6 +26,7 @@ from hpao.realtime.postgres import (
     asyncpg_dsn,
 )
 from hpao.realtime.publisher import InMemoryPublisher, RealtimePublisher
+from hpao.realtime.websocket import make_realtime_router
 
 __all__ = [
     "AlertRaised",
@@ -44,4 +44,6 @@ __all__ = [
     "Severity",
     "asyncpg_dsn",
     "channels_for",
+    "make_app",
+    "make_realtime_router",
 ]
