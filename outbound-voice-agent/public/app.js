@@ -1,17 +1,12 @@
 const startButton = document.querySelector("#startButton");
-const hallPassButton = document.querySelector("#hallPassButton");
 const resetButton = document.querySelector("#resetButton");
 const micToggleButton = document.querySelector("#micToggleButton");
 const callButtonLabel = document.querySelector("#callButtonLabel");
-const hallPassButtonLabel = document.querySelector("#hallPassButtonLabel");
 const micToggleLabel = document.querySelector("#micToggleLabel");
-const connectionStatus = document.querySelector("#connectionStatus");
 const turnStatus = document.querySelector("#turnStatus");
 const transcriptLog = document.querySelector("#transcriptLog");
 const micRing = document.querySelector("#micRing");
 const caseStrip = document.querySelector("#caseStrip");
-const callTab = document.querySelector("#callTab");
-const systemTab = document.querySelector("#systemTab");
 const callView = document.querySelector("#callView");
 const systemView = document.querySelector("#systemView");
 const themeToggle = document.querySelector("#themeToggle");
@@ -40,12 +35,12 @@ function apiPath(path) {
 
 const callScenarios = {
   absentee: {
-    idleLabel: "Start Absentee Call",
+    idleLabel: "Start Call",
     caseSummary: (caseData) => ({
       title: `${caseData.student_name} absentee call`,
-      detail: `${caseData.absences_this_year} absence(s) this year | Policy max ${caseData.max_absences_per_school_year}`
+      detail: `${caseData.absences_this_year} absence(s) this year | 14 hall passes in 10 days | Policy max ${caseData.max_absences_per_school_year}`
     }),
-    issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} was absent today. Please tell me, is there a valid reason for the absence?`
+    issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} was absent today and has had 14 hall passes in the last 10 school days for a total of 4 hours absent. Please tell me, is there a valid reason for the absence and hall passes?`
   },
   hallPass: {
     idleLabel: "Start Hall Pass Call",
@@ -67,7 +62,7 @@ function buildInitialCallInstructions(scenario = activeScenario) {
     "Start the call from the beginning now.",
     `This is the ${scenario} scenario. The issue sentence below is the only issue for this call.`,
     "Do not substitute a different attendance issue.",
-    `First say exactly: "Hello this is Abe calling from the Austin High School. Is this ${guardianName}?"`,
+    `First say exactly: "Hello this is Ava, your school attendence agent. Is this ${guardianName}?"`,
     "Then immediately repeat the same opening statement in Spanish.",
     `The datastore preferred language is ${preferredLanguage}; use it only as a tie-breaker for ambiguous one-word replies.`,
     'If the guardian says "yes", continue in English. If the guardian says "sí" or "si", continue in Spanish. If the guardian only says "no", use the datastore preferred language as the language tie-breaker while handling the negative answer appropriately.',
@@ -78,28 +73,11 @@ function buildInitialCallInstructions(scenario = activeScenario) {
 }
 
 function setStatus(status, detail) {
-  connectionStatus.textContent = status;
   turnStatus.textContent = detail;
 }
 
 function setMode(mode) {
   document.body.dataset.mode = mode;
-}
-
-function activateTab(tabName) {
-  const isSystem = tabName === "system";
-
-  callTab.classList.toggle("is-active", !isSystem);
-  systemTab.classList.toggle("is-active", isSystem);
-  callTab.setAttribute("aria-selected", String(!isSystem));
-  systemTab.setAttribute("aria-selected", String(isSystem));
-  callView.classList.toggle("is-active", !isSystem);
-  systemView.classList.toggle("is-active", isSystem);
-  callView.hidden = isSystem;
-  systemView.hidden = !isSystem;
-  const nextUrl = new URL(window.location.href);
-  nextUrl.hash = isSystem ? "system" : "";
-  window.history.replaceState(null, "", nextUrl);
 }
 
 function applyTheme(theme) {
@@ -133,16 +111,11 @@ function resetMicrophoneToggle() {
 
 function setCallButtonStarted(started, scenario = activeScenario) {
   const absenteeStarted = started && scenario === "absentee";
-  const hallPassStarted = started && scenario === "hallPass";
 
   callButtonLabel.textContent = absenteeStarted ? "End Call" : callScenarios.absentee.idleLabel;
-  hallPassButtonLabel.textContent = hallPassStarted ? "End Call" : callScenarios.hallPass.idleLabel;
   startButton.classList.toggle("is-ending", absenteeStarted);
-  hallPassButton.classList.toggle("is-ending", hallPassStarted);
   startButton.setAttribute("aria-pressed", String(absenteeStarted));
-  hallPassButton.setAttribute("aria-pressed", String(hallPassStarted));
   startButton.disabled = started && !absenteeStarted;
-  hallPassButton.disabled = started && !hallPassStarted;
 }
 
 function toggleMicrophoneListening() {
@@ -425,7 +398,6 @@ async function startSession(scenario = "absentee") {
   isCaseSummaryVisible = true;
   renderCaseSummary(scenario);
   startButton.disabled = true;
-  hallPassButton.disabled = true;
   resetButton.disabled = true;
   setMode("connecting");
   setStatus("Connecting", "Requesting microphone access.");
@@ -504,7 +476,6 @@ async function startSession(scenario = "absentee") {
   });
 
   startButton.disabled = false;
-  hallPassButton.disabled = false;
   setCallButtonStarted(true, scenario);
   resetButton.disabled = false;
   micToggleButton.disabled = isListenOnlySession;
@@ -524,7 +495,6 @@ function stopSession() {
   shouldKeepListenOnlyStatus = false;
 
   startButton.disabled = false;
-  hallPassButton.disabled = false;
   setCallButtonStarted(false);
   resetButton.disabled = true;
   setMode("idle");
@@ -566,10 +536,6 @@ startButton.addEventListener("click", () => {
   handleScenarioButtonClick("absentee");
 });
 
-hallPassButton.addEventListener("click", () => {
-  handleScenarioButtonClick("hallPass");
-});
-
 micToggleButton.addEventListener("click", toggleMicrophoneListening);
 resetButton.addEventListener("click", async () => {
   try {
@@ -581,11 +547,9 @@ resetButton.addEventListener("click", async () => {
   }
 });
 
-callTab.addEventListener("click", () => activateTab("call"));
-systemTab.addEventListener("click", () => activateTab("system"));
 themeToggle.addEventListener("click", toggleTheme);
 
 applyTheme(localStorage.getItem("attendanceOfficerTheme") ?? "light");
-if (window.location.hash === "#system") {
-  activateTab("system");
-}
+callView.classList.add("is-active");
+callView.hidden = false;
+systemView.hidden = true;

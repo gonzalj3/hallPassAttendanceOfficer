@@ -4,7 +4,7 @@ export const CALL_SCENARIOS = {
   absentee: {
     label: "absentee",
     issueSentence: (caseData) =>
-      `${caseData?.student_name ?? "The student"} was absent today. Please tell me, is there a valid reason for the absence?`
+      `${caseData?.student_name ?? "The student"} was absent today and has had 14 hall passes in the last 10 school days for a total of 4 hours absent. Please tell me, is there a valid reason for the absence and hall passes?`
   },
   hallPass: {
     label: "hall pass",
@@ -37,7 +37,7 @@ function buildAttendanceInstructions(caseData = {}, options = {}) {
     `Policy limit: no more than ${maxAbsences} days missed in a school year.`,
     "",
     "# Call Flow",
-    `Start every new or reset call with this exact English opening: "Hello this is Abe calling from the Austin High School. Is this ${parentName}?"`,
+    `Start every new or reset call with this exact English opening: "Hello this is Ava, your school attendence agent. Is this ${parentName}?"`,
     "Immediately after the English opening, repeat the same opening statement in Spanish.",
     "After the bilingual guardian identity check, use the appropriate language for the rest of the call based on the language spoken by the person.",
     `Selected call scenario: ${scenario.label}.`,

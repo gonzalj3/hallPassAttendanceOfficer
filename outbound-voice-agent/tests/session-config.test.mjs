@@ -51,7 +51,7 @@ test("session config scripts the attendance call objective", async () => {
   assert.match(config.instructions, /no more than 10 days/);
 });
 
-test("session config requires the exact bilingual Abe opening", () => {
+test("session config requires the exact bilingual Ava opening", () => {
   const config = buildSessionConfig({
     parent_name: "Morgan Johnson",
     student_name: "Avery Johnson"
@@ -59,7 +59,7 @@ test("session config requires the exact bilingual Abe opening", () => {
 
   assert.match(
     config.instructions,
-    /Hello this is Abe calling from the Austin High School\. Is this Morgan Johnson\?/
+    /Hello this is Ava, your school attendence agent\. Is this Morgan Johnson\?/
   );
   assert.match(config.instructions, /repeat the same opening statement in Spanish/i);
   assert.match(config.instructions, /After confirming the guardian identity, say exactly the full required issue sentence in one speaking turn/i);
@@ -78,7 +78,7 @@ test("session config embeds the selected issue sentence durably", () => {
 
   assert.match(
     absenteeConfig.instructions,
-    /Required issue sentence for this call: "Avery Johnson was absent today\. Please tell me, is there a valid reason for the absence\?"/
+    /Required issue sentence for this call: "Avery Johnson was absent today and has had 14 hall passes in the last 10 school days for a total of 4 hours absent\. Please tell me, is there a valid reason for the absence and hall passes\?"/
   );
   assert.match(
     hallPassConfig.instructions,
