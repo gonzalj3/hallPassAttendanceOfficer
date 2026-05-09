@@ -9,7 +9,8 @@ Living doc. Update after each phase ships.
   - ✅ 1a: Persistence scaffolding (`d493122`)
   - ✅ 1b: Schools + Students (`110d7d0`)
   - ✅ 1c: Users + Classes + Enrollments + Class Sessions
-- 🔄 **Phase 2** — Attendance core (in progress)
+- ✅ **Phase 2** — Attendance core (complete)
+- ⏭ **Phase 3** — Hall passes (next)
 
 ## All phases
 
