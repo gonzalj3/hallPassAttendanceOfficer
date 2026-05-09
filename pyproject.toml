@@ -44,7 +44,7 @@ packages = ["src/hpao"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-q --strict-markers --strict-config"
+addopts = "-q --strict-markers --strict-config --import-mode=importlib"
 markers = [
     "integration: requires a real postgres (testcontainers + Docker)",
     "e2e: full-stack test, slowest",
