@@ -1,23 +1,27 @@
 # Hall Pass Attendance Officer (HPAO)
 
-Hackathon MVP. **Single school.** Backend + agent that owns attendance, hall passes, and policy compliance, and emits real-time alerts.
+Hackathon MVP. **Single school.** Backend + agent that owns attendance, hall passes, and policy compliance, and emits real-time alerts. End-to-end demo with a React/Vite frontend hitting the live backend over REST + WebSocket.
 
 ## Status (2026-05-09)
 
 | Area | State |
 |---|---|
-| Persistence: schools, students, users, classes, sessions, attendance, hall passes, alerts, agent_messages | ✅ migrations 0001–0008 |
+| Persistence: schools, students, users, classes, sessions, attendance, hall passes, alerts, agent_messages, policies | ✅ migrations 0001–0009 |
 | Attendance service (`record_attendance`, `list_*`) — idempotent upsert | ✅ |
 | Hall pass service (issue/check-in/overdue) + 15-min restroom default | ✅ |
-| Real-time `LISTEN/NOTIFY` + WebSocket fan-out (other agent) | ✅ |
-| Policy ingestion + pgvector RAG + rule evaluator (other agent) | ✅ |
+| Real-time `LISTEN/NOTIFY` + WebSocket fan-out | ✅ |
+| Policy ingestion + pgvector RAG + rule evaluator | ✅ |
 | Alerts service + `detect_overdue_passes` (the headline trigger) | ✅ |
 | Inter-agent boundary endpoints (HMAC-signed) | ✅ except `policy-search` + `excuses` (not yet exposed) |
 | Demo dispatcher loop (`detect → dispatch`) + CLI runner | ✅ |
-| OpenAI Codex agent loop wrapping the tool surface | ⏭ optional, post-demo |
-| Audit log + observability hardening | ⏭ optional, post-hackathon |
+| OpenAI Codex agent loop wrapping the tool surface | ✅ |
+| **Top-level FastAPI app** — composes WS + agent boundary + browser REST + CORS | ✅ |
+| **Browser-facing REST surface** at `/api/*` (no HMAC, camelCase) | ✅ |
+| **Demo seed CLI** (`python -m hpao.cli.seed`) | ✅ |
+| **Frontend wired to backend** — Vite/React calls `/api/*`, subscribes via WebSocket | ✅ |
+| Audit log + observability hardening (Phase 9) | ⏭ optional, post-hackathon |
 
-Test gate: ~258 tests on `main`, full suite green. Pre-commit runs unit on commit, full suite on push.
+Test gate: 292 tests on `main`, full suite green. Pre-commit runs unit on commit, full suite on push.
 
 ## Quick start
 
@@ -48,23 +52,56 @@ Required env (or `.env`):
 
 If `PARENT_COMMS_URL` / `_SECRET` are unset, the dispatcher still runs `detect_overdue_passes` (state hygiene) but skips outbound webhooks — useful when the teammate's agent isn't up.
 
-## Run the API locally (for the frontend)
+## Run the full stack locally (frontend + backend)
 
 ```bash
-make db-up                                   # Postgres 16 + pgvector
-.venv/bin/alembic upgrade head               # schema
+make db-up                                          # Postgres 16 + pgvector
+.venv/bin/alembic upgrade head                      # schema (0001-0009)
+.venv/bin/python -m hpao.cli.seed                   # demo school + 3 classes + 12 students (idempotent)
 .venv/bin/uvicorn --factory hpao.app:app_factory --reload --port 8000
+
+# in another terminal
+cd frontend && npm install && npm run dev           # Vite at http://localhost:3000
 ```
 
-The app exposes:
-- `GET  /healthz`                       — liveness
-- `GET  /openapi.json` · `/docs`        — Swagger UI
-- `WS   /v1/realtime?channel=…`         — Phase 4c fan-out
-- `POST /v1/agent/inbound/parent-message` (HMAC) — Phase 8 inter-agent
+The backend exposes:
+- `GET  /healthz`                                    — liveness
+- `GET  /openapi.json` · `/docs`                     — Swagger UI
+- `GET  /api/sessions`                               — today's class sessions
+- `GET  /api/sessions/{id}/students`                 — roster + active passes
+- `POST /api/hall-passes`                            — issue (teacher inferred from session)
+- `POST /api/hall-passes/{id}/return`                — check-in
+- `GET  /api/hall-passes`                            — list, optional `status_filter` / `session_id` query
+- `WS   /v1/realtime?channel=…`                      — Phase 4c fan-out
+- `POST /v1/agent/inbound/parent-message` (HMAC)     — Phase 8 inter-agent
 - `POST /v1/agent/inbound/parent-response` (HMAC)
 - `GET  /v1/agent/student-context/{id}` (HMAC)
 
-CORS: `FRONTEND_ORIGIN` (defaults to the deployed Netlify URL) plus any `http://localhost:*` are allowed for browsers.
+CORS: `FRONTEND_ORIGIN` (defaults to the deployed Netlify URL) plus any `http://localhost:*` are always allowed.
+
+### Local port collisions
+
+If your machine already has Postgres on 5432 (homebrew etc.), drop a local-only `docker-compose.override.yml` (already gitignored) to remap to 5433 and update `.env`:
+
+```yaml
+services:
+  db:
+    ports:
+      - "5433:5432"
+```
+
+```bash
+DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5433/hpao
+```
+
+Same idea for the API port — pass `--port 8765` (or whatever's free) and set `VITE_API_URL=http://localhost:8765` in `frontend/.env.local`.
+
+### Frontend env vars
+
+| Var | Default | Notes |
+|---|---|---|
+| `VITE_API_URL` | `http://localhost:8731` | REST base. Override on Netlify dashboard for deploys. |
+| `VITE_WS_URL` | derived from `VITE_API_URL` (`http` → `ws`) | Use `wss://` when frontend is HTTPS. |
 
 ## Demo runbook (the 15-min restroom flow, end-to-end)
 
@@ -203,7 +240,7 @@ Enums:
 - `attendance.status`: `PRESENT | ABSENT | TARDY | EXCUSED | UNEXCUSED`
 - `attendance.source`: `TEACHER | AGENT | IMPORT`
 - `hall_pass.status`: `ACTIVE | RETURNED | OVERDUE | FLAGGED`
-- `hall_pass.destination`: `RESTROOM | NURSE | COUNSELOR | OFFICE | OTHER`
+- `hall_pass.destination`: `RESTROOM | NURSE | COUNSELOR | OFFICE | OTHER | HALLWAY | CLASSROOM` (HALLWAY + CLASSROOM added in migration 0009 to match the frontend's destination set)
 - `alert.severity`: `low | medium | high | critical`
 - `alert.status`: `OPEN | ACKNOWLEDGED | RESOLVED`
 - `agent_message.direction`: `INBOUND | OUTBOUND`
@@ -241,12 +278,17 @@ SSO, SIS sync, multi-tenant, mobile UIs, push notifications, parent-facing UX (t
 ## Pointers
 
 - **Plan + status**: `PLAN.md` (living doc, also tracks per-phase completion).
-- **Migrations**: `alembic/versions/` (0001–0008 currently).
+- **Migrations**: `alembic/versions/` (0001–0009 currently).
+- **Top-level app factory**: `src/hpao/app.py` (`make_app(database_url, ...)` and `app_factory()` for `uvicorn --factory`).
 - **Domain models**: `src/hpao/models/`.
 - **Services** (DB I/O, business logic): `src/hpao/services/` — `attendance.py`, `hall_pass.py`, `alerts.py`, `agent_messages.py`, `dispatcher.py`.
-- **API routers**: `src/hpao/api/agent.py` (boundary), `src/hpao/realtime/` (WebSocket).
+- **API routers**: `src/hpao/api/agent.py` (HMAC boundary), `src/hpao/api/frontend.py` (browser-facing REST), `src/hpao/realtime/` (WebSocket).
 - **Outbound HTTP client**: `src/hpao/integrations/parent_comms.py`.
-- **Boundary schemas (Pydantic)**: `src/hpao/schemas/agent.py`.
+- **Boundary schemas (Pydantic)**: `src/hpao/schemas/agent.py` (HMAC), `src/hpao/schemas/frontend.py` (camelCase REST).
 - **HMAC sign/verify**: `src/hpao/api/security.py`.
-- **CLI demo runner**: `python -m hpao.cli.dispatcher`.
-- **OpenAPI**: `/openapi.json` once an app mounting the routers is running.
+- **CLIs**:
+  - `python -m hpao.cli.dispatcher` — periodic overdue-pass detector
+  - `python -m hpao.cli.agent "..."` — Phase 7 OpenAI agent loop
+  - `python -m hpao.cli.seed` — demo data (idempotent)
+- **Frontend** (React/Vite): `frontend/src/` with `api/{client,types,realtime}.ts` providing typed fetch wrappers + `useRealtime` hook. Deploys to Netlify via `netlify.toml`.
+- **OpenAPI**: `/openapi.json` once `app_factory` is running.

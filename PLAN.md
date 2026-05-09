@@ -11,37 +11,66 @@ Living doc. Update after each phase ships.
   - ✅ 1c: Users + Classes + Enrollments + Class Sessions
 - ✅ **Phase 2** — Attendance core (complete)
 - ✅ **Phase 3** — Hall passes (complete)
-- ✅ **Phase 4** — Real-time layer (other agent; 4a + 4b + 4c shipped)
-- ✅ **Phase 5a** — Policies + chunks + rules schema (other agent; rule evaluator still to come)
+- ✅ **Phase 4** — Real-time layer (4a + 4b + 4c shipped)
+- ✅ **Phase 5** — Policy ingestion + rule engine
+  - ✅ 5a: Policies + chunks + rules schema
+  - ✅ 5b: Rule expression evaluator + idempotent seed
+  - ✅ 5c: Policy embedding pipeline + pgvector RAG search
 - ✅ **Phase 6** — Alerts + 15-min restroom rule (complete)
-- ✅ **Phase 5b** — Rule expression evaluator + idempotent seed (other agent)
-- ✅ **Phase 5c** — Policy embedding pipeline + pgvector RAG search (other agent)
+- ✅ **Phase 7** — OpenAI Codex agent loop wrapping the tool surface
 - ✅ **Phase 8** — Inter-agent boundary endpoints (complete)
 - ✅ **Demo wire-up** — Periodic dispatcher loop tying `detect_overdue_passes` to `dispatch_alert`
-- ✅ **Phase 7** — OpenAI Codex agent loop wrapping the tool surface
+- ✅ **Frontend integration** (3 steps; see "Frontend integration" below for the runbook)
+  - ✅ Step 1: Top-level FastAPI app composing WS + agent boundary + browser REST + CORS (`32ca082`)
+  - ✅ Step 2: Browser-facing REST router at `/api/*`, demo seed CLI, migration 0009 expanding hall pass destinations (`534ba4a`)
+  - ✅ Step 3: Frontend wired to backend — `mockData.ts` deleted, pages call REST + subscribe over WebSocket (`e54a128`)
+- ⏭ **Phase 9** — Audit log + observability hardening (post-hackathon)
 
-## Demo runbook
+## Frontend integration
 
-To run the headline 15-min restroom flow end-to-end locally:
+Three commits stitch the React/Vite frontend in `frontend/` to the backend in this repo. With both running locally, clicking a student in the UI actually issues a hall pass on the backend, and overdue alerts land back in the UI live over WebSocket.
 
-1. `make db-up` — start Postgres (pgvector image)
-2. `make install` — venv + deps + pre-commit hooks
-3. Set env: `DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5432/hpao`,
+**Run both stacks locally:**
+
+```bash
+make db-up
+.venv/bin/alembic upgrade head
+.venv/bin/python -m hpao.cli.seed                       # demo school + classes + students (idempotent)
+.venv/bin/uvicorn --factory hpao.app:app_factory --reload --port 8000
+
+cd frontend && npm install && npm run dev               # http://localhost:3000
+```
+
+**What happens when you click through the UI:**
+
+1. **ClassSelectPage** → `GET /api/sessions` returns today's class sessions for the demo school.
+2. **RosterPage** → `GET /api/sessions/{id}/students` returns the roster + active passes, then opens a WebSocket to `class:<classId>` and `school:<schoolId>` so any subsequent server-side event triggers a refetch.
+3. **DestinationPage** → no API call; just navigation state.
+4. **PassActivePage** → `POST /api/hall-passes` issues the pass; teacher is inferred from the session's class.
+5. **CheckedOutCard "Tap to Check-in"** → `POST /api/hall-passes/{id}/return`.
+
+**Live overdue alert demo:** in a third terminal, `DISPATCHER_INTERVAL_SECONDS=5 python -m hpao.cli.dispatcher`. Issue a pass with `duration_minutes=1`; within 5 seconds the dispatcher flips it to `OVERDUE`, raises an alert, posts to parent-comms (if `PARENT_COMMS_URL` is set), and the WS event lands at the UI which refetches automatically.
+
+**Deploying the frontend to Netlify:** the existing `netlify.toml` already builds from `frontend/`. Set `VITE_API_URL` and `VITE_WS_URL` in Netlify dashboard → Site settings → Environment, pointing at an ngrok / cloudflared tunnel of the local backend (HTTPS pages can't reach `ws://localhost`).
+
+## Demo runbook (backend-only headline flow)
+
+For demoing the 15-min restroom alert without the frontend in the loop:
+
+1. `make db-up`
+2. Set env: `DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5432/hpao`,
    `PARENT_COMMS_URL=https://your-teammate-agent.example`,
    `PARENT_COMMS_SECRET=<shared HMAC secret>`,
-   `DISPATCHER_INTERVAL_SECONDS=5` (so the demo doesn't take 30s per tick)
-4. `.venv/bin/alembic upgrade head` — apply migrations
-5. `python -m hpao.cli.dispatcher` — start the dispatcher loop in one terminal
-6. In another terminal, issue a hall pass via the service or insert a test row, then wait
-   the 15 minutes (or use a short `duration_minutes=1` on the pass for the demo)
-7. Watch the dispatcher log — within `DISPATCHER_INTERVAL_SECONDS` of the pass going overdue,
-   the pass flips to `OVERDUE`, an alert is raised, and a signed POST hits parent-comms
+   `DISPATCHER_INTERVAL_SECONDS=5`
+3. `.venv/bin/alembic upgrade head`
+4. `python -m hpao.cli.dispatcher` — dispatcher loop in one terminal
+5. In another terminal, issue a hall pass via the service (or hit `POST /api/hall-passes` from the UI / curl) with `duration_minutes=1`
+6. Watch the dispatcher log — within `DISPATCHER_INTERVAL_SECONDS` the pass flips to `OVERDUE`, an alert is raised, and a signed POST hits parent-comms
 
-For a single iteration without the loop: `python -m hpao.cli.dispatcher --once`.
+Single iteration without the loop: `python -m hpao.cli.dispatcher --once`.
 
 Without `PARENT_COMMS_URL` / `PARENT_COMMS_SECRET` set, the dispatcher still runs
-`detect_overdue_passes` for state hygiene but skips outbound webhooks — useful for local
-dev when the parent-comms agent isn't up.
+`detect_overdue_passes` for state hygiene but skips outbound webhooks.
 
 ## All phases
 
@@ -76,20 +105,24 @@ Phase 9 is post-hackathon unless judges care about audit trails.
 
 ## Ownership
 
-- **🔵 Phase 4 (real-time)** is being implemented by a separate coding agent in parallel. This repo is shared.
-- The seam stays clean by design: Phases 2 / 3 / 6 just write to the DB; the Phase 4 layer reads those writes via `LISTEN/NOTIFY` triggers and fans them out. No code-level coupling between the agents.
-- Pull/fetch before every push to integrate the other agent's work.
-- Don't edit `src/hpao/realtime/`, NOTIFY trigger migrations, or WebSocket endpoints — those belong to the other agent.
+This repo is shared with several agents working in parallel. Practical rules to keep merges painless:
+
+- **Pull/fetch before every push.** Migrations are numbered, so two agents picking the same `0005_*` causes an alembic head split.
+- **Stay in your lane.** Realtime owners don't touch service code; service authors don't reshape `src/hpao/realtime/`.
+- **Frontend code lives under `frontend/`** and pulls types from `src/hpao/schemas/frontend.py`. The Pydantic schemas are the single source of truth for wire shapes — keep them in sync byte-for-byte with the TypeScript types in `frontend/src/api/types.ts`.
 
 ## Conventions (followed per phase)
 
 - Red → green → refactor at the service-layer boundary.
-- One migration per logical sub-phase. Migrations hand-written until the schema is large enough to justify autogen.
+- One migration per logical sub-phase. Migrations hand-written until the schema is large enough to justify autogen. **Wrap constraint names in `op.f(...)`** when dropping or recreating, so the naming convention isn't reapplied on top of an already-formatted name (see migration 0009 for the gotcha).
 - Pre-commit gate runs unit tests on every commit. Pre-push runs full suite (integration auto-skips when Docker is off; CI always has Docker).
 - Add factories for every new entity in `tests/factories.py`.
 - Update `CLAUDE.md` if a contract changes.
 - New tables get UUID PK, `created_at` / `updated_at` (TIMESTAMPTZ), and DB-level constraints (FK, UNIQUE, CHECK).
+- Browser-facing JSON uses **camelCase**, internal Pydantic stays snake_case. Use `Field(serialization_alias=...)` / `validation_alias=...` to bridge — see `src/hpao/schemas/frontend.py`.
+- Browser-facing endpoints don't sign HMAC; they go in `src/hpao/api/frontend.py`. Inter-agent endpoints sign HMAC; they go in `src/hpao/api/agent.py`. Don't mix.
+- Tests for browser routes use **`httpx.AsyncClient` + `ASGITransport`** (not FastAPI `TestClient`) so the test, fixtures, and route handlers all share one event loop and one transactional session.
 
 ## Currently working on
 
-Phase 1 complete. Ready to start **Phase 2 — Attendance core** when given the go-ahead. Phase 2 plan: `attendance_records` table (one row per session × student, status enum, source enum, FK to class_sessions + students), service layer with idempotent record/edit, integration tests for the (session, student) UNIQUE invariant and source tracking.
+Stack is functionally complete. Phase 9 (audit trail + observability hardening) is the only open item, and only matters if judges care about it — pre-hackathon cleanup if there's time, otherwise post-event.
