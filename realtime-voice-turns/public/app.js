@@ -1,10 +1,21 @@
 const startButton = document.querySelector("#startButton");
-const stopButton = document.querySelector("#stopButton");
+const hallPassButton = document.querySelector("#hallPassButton");
+const resetButton = document.querySelector("#resetButton");
+const micToggleButton = document.querySelector("#micToggleButton");
+const callButtonLabel = document.querySelector("#callButtonLabel");
+const hallPassButtonLabel = document.querySelector("#hallPassButtonLabel");
+const micToggleLabel = document.querySelector("#micToggleLabel");
 const connectionStatus = document.querySelector("#connectionStatus");
 const turnStatus = document.querySelector("#turnStatus");
 const transcriptLog = document.querySelector("#transcriptLog");
 const micRing = document.querySelector("#micRing");
 const caseStrip = document.querySelector("#caseStrip");
+const callTab = document.querySelector("#callTab");
+const systemTab = document.querySelector("#systemTab");
+const callView = document.querySelector("#callView");
+const systemView = document.querySelector("#systemView");
+const themeToggle = document.querySelector("#themeToggle");
+const localServerOrigin = "http://localhost:5178";
 
 let peerConnection = null;
 let dataChannel = null;
@@ -13,6 +24,47 @@ let activeCase = null;
 let messages = [];
 let savedMessageCount = 0;
 let processedToolCallIds = new Set();
+let isListenOnlySession = false;
+let shouldKeepListenOnlyStatus = false;
+let isMicrophoneListening = false;
+let activeScenario = "absentee";
+
+function apiPath(path) {
+  if (window.location.protocol === "file:") {
+    return `${localServerOrigin}${path}`;
+  }
+
+  return path;
+}
+
+const callScenarios = {
+  absentee: {
+    idleLabel: "Start Absentee Call",
+    caseSummary: (caseData) => `${caseData.student_name} | ${caseData.absences_this_year} absence(s) this year | Policy max ${caseData.max_absences_per_school_year}`,
+    issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} was absent today. Please tell me, is there a valid reason for the absence?`
+  },
+  hallPass: {
+    idleLabel: "Start Hall Pass Call",
+    caseSummary: (caseData) => `${caseData.student_name} | 14 hall passes in 10 school days | 4 hours outside class`,
+    issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} has had 14 hall passes in the last 10 school days for a total of 4 hours of time outside class. Please tell me, is there a valid reason for this hall pass use?`
+  }
+};
+
+function buildInitialCallInstructions(scenario = activeScenario) {
+  const guardianName = activeCase?.parent_name ?? "the parent or guardian";
+  const scenarioConfig = callScenarios[scenario] ?? callScenarios.absentee;
+  const issueSentence = scenarioConfig.issueSentence(activeCase);
+
+  return [
+    "Start the call from the beginning now.",
+    `This is the ${scenario} scenario. The issue sentence below is the only issue for this call.`,
+    "Do not substitute a different attendance issue.",
+    `First say exactly: "Hello this is Abe calling from the Austin High School. Is this ${guardianName}?"`,
+    "Then immediately repeat the same opening statement in Spanish.",
+    "After the person confirms they are the guardian, continue in the language spoken by the person who responds.",
+    `Then say exactly: "${issueSentence}"`
+  ].join(" ");
+}
 
 function setStatus(status, detail) {
   connectionStatus.textContent = status;
@@ -23,16 +75,125 @@ function setMode(mode) {
   document.body.dataset.mode = mode;
 }
 
+function activateTab(tabName) {
+  const isSystem = tabName === "system";
+
+  callTab.classList.toggle("is-active", !isSystem);
+  systemTab.classList.toggle("is-active", isSystem);
+  callTab.setAttribute("aria-selected", String(!isSystem));
+  systemTab.setAttribute("aria-selected", String(isSystem));
+  callView.classList.toggle("is-active", !isSystem);
+  systemView.classList.toggle("is-active", isSystem);
+  callView.hidden = isSystem;
+  systemView.hidden = !isSystem;
+  const nextUrl = new URL(window.location.href);
+  nextUrl.hash = isSystem ? "system" : "";
+  window.history.replaceState(null, "", nextUrl);
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const isDark = theme === "dark";
+  themeToggle.textContent = isDark ? "Dark" : "Light";
+  themeToggle.setAttribute("aria-pressed", String(isDark));
+  localStorage.setItem("attendanceOfficerTheme", theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme ?? "light";
+  applyTheme(current === "dark" ? "light" : "dark");
+}
+
+function setMicrophoneListening(enabled) {
+  isMicrophoneListening = enabled;
+
+  for (const track of mediaStream?.getAudioTracks() ?? []) {
+    track.enabled = enabled;
+  }
+
+  micToggleLabel.textContent = enabled ? "Pause Mic" : "Enable Mic";
+  micToggleButton.setAttribute("aria-pressed", String(enabled));
+}
+
+function resetMicrophoneToggle() {
+  setMicrophoneListening(false);
+  micToggleButton.disabled = true;
+}
+
+function setCallButtonStarted(started, scenario = activeScenario) {
+  const absenteeStarted = started && scenario === "absentee";
+  const hallPassStarted = started && scenario === "hallPass";
+
+  callButtonLabel.textContent = absenteeStarted ? "End Call" : callScenarios.absentee.idleLabel;
+  hallPassButtonLabel.textContent = hallPassStarted ? "End Call" : callScenarios.hallPass.idleLabel;
+  startButton.classList.toggle("is-ending", absenteeStarted);
+  hallPassButton.classList.toggle("is-ending", hallPassStarted);
+  startButton.setAttribute("aria-pressed", String(absenteeStarted));
+  hallPassButton.setAttribute("aria-pressed", String(hallPassStarted));
+  startButton.disabled = started && !absenteeStarted;
+  hallPassButton.disabled = started && !hallPassStarted;
+}
+
+function toggleMicrophoneListening() {
+  if (!mediaStream || isListenOnlySession) return;
+
+  const nextState = !isMicrophoneListening;
+  setMicrophoneListening(nextState);
+  setStatus(
+    nextState ? "Mic Listening" : "Mic Paused",
+    nextState ? "The parent microphone is on." : "The parent microphone is muted."
+  );
+}
+
+function transcriptLabelFor(label) {
+  const labels = {
+    assistant: "ABE",
+    parent: "GUARDIAN",
+    system: "STATUS",
+    error: "ERROR"
+  };
+
+  return labels[label] ?? label.toUpperCase();
+}
+
 function appendLog(label, text) {
   const muted = transcriptLog.querySelector(".muted");
   if (muted) muted.remove();
 
   const row = document.createElement("p");
   const speaker = document.createElement("strong");
-  speaker.textContent = label;
+  speaker.textContent = transcriptLabelFor(label);
   row.append(speaker, ` ${text}`);
   transcriptLog.append(row);
   transcriptLog.scrollTop = transcriptLog.scrollHeight;
+}
+
+function resetTranscriptLog() {
+  transcriptLog.replaceChildren();
+  const row = document.createElement("p");
+  row.className = "muted";
+  row.textContent = "Realtime events will appear here once connected.";
+  transcriptLog.append(row);
+}
+
+function isMicrophonePermissionError(error) {
+  return error instanceof DOMException && (
+    error.name === "NotAllowedError" ||
+    error.name === "PermissionDeniedError" ||
+    error.name === "SecurityError"
+  );
+}
+
+function showListenOnlyWarning() {
+  shouldKeepListenOnlyStatus = true;
+  setStatus("Microphone Blocked", "Starting listen-only preview. Use a browser with mic access to answer as the parent.");
+  appendLog("system", "Microphone permission was denied, so this session will play the agent audio only.");
+}
+
+function startListenOnlySession() {
+  isListenOnlySession = true;
+  peerConnection.addTransceiver("audio", { direction: "recvonly" });
+  showListenOnlyWarning();
 }
 
 function recordMessage(speaker, transcript) {
@@ -50,7 +211,7 @@ async function saveNewMessages() {
   const unsavedMessages = messages.slice(savedMessageCount);
   if (!activeCase || unsavedMessages.length === 0) return;
 
-  const response = await fetch("/conversation-log", {
+  const response = await fetch(apiPath("/conversation-log"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -65,9 +226,9 @@ async function saveNewMessages() {
     throw new Error(await response.text());
   }
 
-  const data = await response.json();
+  await response.json();
   savedMessageCount = messages.length;
-  appendLog("system", `Saved ${data.rows_written} row(s) to data/output/conversations.csv.`);
+  appendLog("system", "Data Saved.");
 }
 
 function parseFunctionArguments(rawArguments) {
@@ -96,9 +257,8 @@ async function submitAttendanceExcuse(functionCall) {
 
   processedToolCallIds.add(toolCallId);
   const excuse = parseFunctionArguments(functionCall.arguments);
-  appendLog("system", "Submitting confirmed excuse to the mock attendance datastore.");
 
-  const response = await fetch("/attendance-excuse", {
+  const response = await fetch(apiPath("/attendance-excuse"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -114,7 +274,7 @@ async function submitAttendanceExcuse(functionCall) {
   }
 
   const result = await response.json();
-  appendLog("system", `Excuse saved as ${result.excuse_record_id} (${result.status}).`);
+  appendLog("system", "Data Saved.");
 
   dataChannel.send(JSON.stringify({
     type: "conversation.item.create",
@@ -147,7 +307,7 @@ function handleFunctionCalls(response) {
     submitAttendanceExcuse(functionCall).catch((error) => {
       setMode("error");
       setStatus("Save Error", "The attendance excuse could not be saved.");
-      appendLog("error", error instanceof Error ? error.message : "Unknown save error.");
+      appendLog("error", "Data could not be saved.");
     });
   }
 
@@ -166,8 +326,9 @@ function handleRealtimeEvent(rawEvent) {
 
   switch (event.type) {
     case "session.created":
-      setStatus("Connected", "Listening. Starting the attendance call.");
-      appendLog("system", "Realtime session created.");
+      if (!shouldKeepListenOnlyStatus) {
+        setStatus("Connected", "Mic paused. Click Enable Mic when the parent is ready to respond.");
+      }
       break;
     case "input_audio_buffer.speech_started":
       setMode("listening");
@@ -193,18 +354,24 @@ function handleRealtimeEvent(rawEvent) {
     case "response.done":
       if (!handleFunctionCalls(event.response)) {
         setMode("ready");
-        setStatus("Listening", "Ready for the parent response or next call turn.");
+        if (shouldKeepListenOnlyStatus) {
+          setStatus("Listen Only", "Opening played. Parent responses need microphone access.");
+        } else if (!isMicrophoneListening) {
+          setStatus("Mic Paused", "Click Enable Mic when the parent is ready to respond.");
+        } else {
+          setStatus("Listening", "Ready for the parent response or next call turn.");
+        }
       }
       saveNewMessages().catch((error) => {
         setMode("error");
         setStatus("Save Error", "The conversation transcript could not be saved.");
-        appendLog("error", error instanceof Error ? error.message : "Unknown save error.");
+        appendLog("error", "Data could not be saved.");
       });
       break;
     case "error":
       setMode("error");
       setStatus("Error", event.error?.message ?? "Realtime error.");
-      appendLog("error", event.error?.message ?? JSON.stringify(event));
+      appendLog("error", "Realtime error.");
       break;
     default:
       break;
@@ -212,22 +379,36 @@ function handleRealtimeEvent(rawEvent) {
 }
 
 async function loadCase() {
-  const response = await fetch("/case");
+  const response = await fetch(apiPath("/case"));
   if (!response.ok) {
     throw new Error(await response.text());
   }
 
   activeCase = await response.json();
-  caseStrip.textContent = `${activeCase.student_name} | ${activeCase.absences_this_year} absence(s) this year | Policy max ${activeCase.max_absences_per_school_year}`;
+  renderCaseSummary(activeScenario);
 }
 
-async function startSession() {
+function renderCaseSummary(scenario = activeScenario) {
+  if (!activeCase) return;
+
+  const scenarioConfig = callScenarios[scenario] ?? callScenarios.absentee;
+  caseStrip.textContent = scenarioConfig.caseSummary(activeCase);
+}
+
+async function startSession(scenario = "absentee") {
+  activeScenario = scenario;
+  renderCaseSummary(scenario);
   startButton.disabled = true;
+  hallPassButton.disabled = true;
+  resetButton.disabled = true;
   setMode("connecting");
   setStatus("Connecting", "Requesting microphone access.");
   messages = [];
   savedMessageCount = 0;
   processedToolCallIds = new Set();
+  isListenOnlySession = false;
+  shouldKeepListenOnlyStatus = false;
+  resetTranscriptLog();
   await loadCase();
 
   peerConnection = new RTCPeerConnection();
@@ -238,25 +419,39 @@ async function startSession() {
     audio.srcObject = event.streams[0];
   };
 
-  mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
+    setMicrophoneListening(false);
+  } catch (error) {
+    if (!isMicrophonePermissionError(error)) {
+      throw error;
     }
-  });
-  mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
+
+    startListenOnlySession();
+  }
 
   dataChannel = peerConnection.createDataChannel("oai-events");
   dataChannel.addEventListener("message", handleRealtimeEvent);
   dataChannel.addEventListener("open", () => {
     setMode("ready");
-    setStatus("Connected", "Starting the attendance notice.");
+    if (isListenOnlySession) {
+      shouldKeepListenOnlyStatus = true;
+      setStatus("Listen Only", "Playing the opening. Parent responses are disabled until microphone access is allowed.");
+    } else {
+      setStatus("Connected", "Starting the attendance notice. Mic is paused.");
+    }
     dataChannel.send(JSON.stringify({
       type: "response.create",
       response: {
         output_modalities: ["audio"],
-        instructions: "Begin the attendance call now. Use the configured attendance case and policy."
+        instructions: buildInitialCallInstructions(scenario)
       }
     }));
   });
@@ -264,7 +459,7 @@ async function startSession() {
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
-  const sdpResponse = await fetch("/session", {
+  const sdpResponse = await fetch(apiPath("/session"), {
     method: "POST",
     body: offer.sdp,
     headers: {
@@ -282,11 +477,16 @@ async function startSession() {
     sdp: await sdpResponse.text()
   });
 
-  stopButton.disabled = false;
+  startButton.disabled = false;
+  hallPassButton.disabled = false;
+  setCallButtonStarted(true, scenario);
+  resetButton.disabled = false;
+  micToggleButton.disabled = isListenOnlySession;
   micRing.setAttribute("aria-hidden", "true");
 }
 
 function stopSession() {
+  resetMicrophoneToggle();
   mediaStream?.getTracks().forEach((track) => track.stop());
   dataChannel?.close();
   peerConnection?.close();
@@ -294,27 +494,69 @@ function stopSession() {
   mediaStream = null;
   dataChannel = null;
   peerConnection = null;
+  isListenOnlySession = false;
+  shouldKeepListenOnlyStatus = false;
 
   startButton.disabled = false;
-  stopButton.disabled = true;
+  hallPassButton.disabled = false;
+  setCallButtonStarted(false);
+  resetButton.disabled = true;
   setMode("idle");
   setStatus("Idle", "Click Start, allow the mic, then respond as the parent.");
+}
+
+async function restartSession() {
+  const scenario = activeScenario;
+  resetButton.disabled = true;
+  stopSession();
+  await startSession(scenario);
 }
 
 loadCase().catch((error) => {
   setMode("error");
   caseStrip.textContent = "Could not load attendance case.";
-  appendLog("error", error instanceof Error ? error.message : "Unknown case load error.");
+  appendLog("error", "Could not load attendance case.");
 });
 
-startButton.addEventListener("click", async () => {
+async function handleScenarioButtonClick(scenario) {
+  if (peerConnection) {
+    stopSession();
+    return;
+  }
+
   try {
-    await startSession();
+    await startSession(scenario);
   } catch (error) {
     stopSession();
     setMode("error");
     setStatus("Error", error instanceof Error ? error.message : "Could not start session.");
   }
+}
+
+startButton.addEventListener("click", () => {
+  handleScenarioButtonClick("absentee");
 });
 
-stopButton.addEventListener("click", stopSession);
+hallPassButton.addEventListener("click", () => {
+  handleScenarioButtonClick("hallPass");
+});
+
+micToggleButton.addEventListener("click", toggleMicrophoneListening);
+resetButton.addEventListener("click", async () => {
+  try {
+    await restartSession();
+  } catch (error) {
+    stopSession();
+    setMode("error");
+    setStatus("Error", error instanceof Error ? error.message : "Could not reset session.");
+  }
+});
+
+callTab.addEventListener("click", () => activateTab("call"));
+systemTab.addEventListener("click", () => activateTab("system"));
+themeToggle.addEventListener("click", toggleTheme);
+
+applyTheme(localStorage.getItem("attendanceOfficerTheme") ?? "light");
+if (window.location.hash === "#system") {
+  activateTab("system");
+}

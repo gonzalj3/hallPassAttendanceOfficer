@@ -41,6 +41,7 @@ test("E2E: loads a case and records a confirmed attendance excuse over HTTP", as
 
     const caseResponse = await fetch(`${baseUrl}/case`);
     assert.equal(caseResponse.status, 200);
+    assert.equal(caseResponse.headers.get("access-control-allow-origin"), "*");
     const caseData = await caseResponse.json();
     assert.equal(caseData.student_id, "STU-1001");
     assert.equal(caseData.guardian_language, "Spanish");
@@ -77,5 +78,28 @@ test("E2E: loads a case and records a confirmed attendance excuse over HTTP", as
     } else {
       await writeFile(EXCUSE_LOG_PATH.pathname, backup, "utf8");
     }
+  }
+});
+
+test("E2E: supports file-mode browser CORS preflights", async () => {
+  const server = createAppServer();
+
+  try {
+    const baseUrl = await listen(server);
+    const response = await fetch(`${baseUrl}/session`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "null",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type"
+      }
+    });
+
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.match(response.headers.get("access-control-allow-methods"), /POST/);
+    assert.match(response.headers.get("access-control-allow-headers"), /Content-Type/);
+  } finally {
+    await close(server);
   }
 });

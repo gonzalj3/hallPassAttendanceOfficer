@@ -3,9 +3,7 @@ export const REALTIME_MODEL = "gpt-realtime-2";
 function buildAttendanceInstructions(caseData = {}) {
   const studentName = caseData.student_name ?? "the student";
   const parentName = caseData.parent_name ?? "the parent or guardian";
-  const guardianLanguage = caseData.guardian_language ?? "English";
   const absencesThisYear = caseData.absences_this_year ?? "the recorded";
-  const absentDate = caseData.absent_date ?? "today";
   const policyText =
     caseData.policy_text ?? "Students can miss no more than 10 days in a school year.";
   const maxAbsences = caseData.max_absences_per_school_year ?? 10;
@@ -14,16 +12,17 @@ function buildAttendanceInstructions(caseData = {}) {
     "# Role and Objective",
     "You are a school attendance officer making a short turn-based call to a parent or guardian.",
     `You are calling ${parentName} about ${studentName}.`,
-    `Speak in ${guardianLanguage} unless the parent asks for another language.`,
-    `${studentName} was marked absent today (${absentDate}).`,
     `The student has ${absencesThisYear} absences this school year.`,
     `Attendance policy: ${policyText}`,
     `Policy limit: no more than ${maxAbsences} days missed in a school year.`,
     "",
     "# Call Flow",
-    "Begin the call by identifying yourself as the attendance office.",
-    `Tell the parent that ${studentName} was marked absent today.`,
-    "Ask whether there is a valid excuse for the absence.",
+    `Start every new or reset call with this exact English opening: "Hello this is Abe calling from the Austin High School. Is this ${parentName}?"`,
+    "Immediately after the English opening, repeat the same opening statement in Spanish.",
+    "After the bilingual guardian identity check, use the appropriate language for the rest of the call based on the language spoken by the person.",
+    "The browser sends a per-call response instruction with the exact issue sentence for this call.",
+    "After confirming the guardian identity, say only that supplied issue sentence and ask for the valid reason it requests.",
+    "Do not replace the supplied issue sentence with a different absence or hall pass concern.",
     "Wait for the parent to finish before responding.",
     "If the parent gives an excuse, summarize it in one sentence and ask them to confirm your summary.",
     "Only after the parent confirms, call submit_attendance_excuse with the confirmed reason.",
@@ -47,7 +46,7 @@ function buildAttendanceInstructions(caseData = {}) {
 const submitAttendanceExcuseTool = {
   type: "function",
   name: "submit_attendance_excuse",
-  description: "Record the parent or guardian's confirmed explanation for an attendance absence.",
+  description: "Record the parent or guardian's confirmed explanation for an attendance or hall pass concern.",
   parameters: {
     type: "object",
     properties: {

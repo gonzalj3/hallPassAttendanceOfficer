@@ -42,9 +42,25 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8"
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, OpenAI-Safety-Identifier",
+  "Access-Control-Max-Age": "86400",
+  "Cache-Control": "no-store"
+};
+
 function sendJson(res, statusCode, body) {
-  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(statusCode, {
+    ...corsHeaders,
+    "Content-Type": "application/json; charset=utf-8"
+  });
   res.end(JSON.stringify(body));
+}
+
+function handleCorsPreflight(res) {
+  res.writeHead(204, corsHeaders);
+  res.end();
 }
 
 async function readRequestBody(req) {
@@ -82,12 +98,18 @@ async function createRealtimeCall(req, res) {
 
   const text = await response.text();
   if (!response.ok) {
-    res.writeHead(response.status, { "Content-Type": "application/json; charset=utf-8" });
+    res.writeHead(response.status, {
+      ...corsHeaders,
+      "Content-Type": "application/json; charset=utf-8"
+    });
     res.end(text);
     return;
   }
 
-  res.writeHead(200, { "Content-Type": "application/sdp" });
+  res.writeHead(200, {
+    ...corsHeaders,
+    "Content-Type": "application/sdp"
+  });
   res.end(text);
 }
 
@@ -132,6 +154,7 @@ async function serveStatic(req, res) {
   try {
     const body = await readFile(filePath);
     res.writeHead(200, {
+      ...corsHeaders,
       "Content-Type": contentTypes[extname(filePath)] ?? "application/octet-stream"
     });
     res.end(body);
@@ -143,6 +166,11 @@ async function serveStatic(req, res) {
 export function createAppServer() {
   return createServer(async (req, res) => {
     try {
+      if (req.method === "OPTIONS") {
+        handleCorsPreflight(res);
+        return;
+      }
+
       if (req.method === "POST" && req.url === "/session") {
         await createRealtimeCall(req, res);
         return;

@@ -42,13 +42,29 @@ test("session config scripts the attendance call objective", async () => {
   const config = buildSessionConfig(caseData);
 
   assert.match(config.instructions, /attendance officer/i);
-  assert.match(config.instructions, /absent today/i);
-  assert.match(config.instructions, /valid excuse/i);
+  assert.match(config.instructions, /per-call response instruction/i);
+  assert.match(config.instructions, /valid reason/i);
   assert.match(config.instructions, /Spanish/);
   assert.match(config.instructions, /confirm your summary/i);
   assert.match(config.instructions, /submit_attendance_excuse/);
   assert.match(config.instructions, /Avery Johnson/);
   assert.match(config.instructions, /no more than 10 days/);
+});
+
+test("session config requires the exact bilingual Abe opening", () => {
+  const config = buildSessionConfig({
+    parent_name: "Morgan Johnson",
+    student_name: "Avery Johnson"
+  });
+
+  assert.match(
+    config.instructions,
+    /Hello this is Abe calling from the Austin High School\. Is this Morgan Johnson\?/
+  );
+  assert.match(config.instructions, /repeat the same opening statement in Spanish/i);
+  assert.match(config.instructions, /After confirming the guardian identity, say only that supplied issue sentence/i);
+  assert.match(config.instructions, /absence or hall pass concern/i);
+  assert.match(config.instructions, /language spoken by the person/i);
 });
 
 test("session config exposes a structured excuse submission tool", () => {
