@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0ea;
+  }
+
+  /* Ensure all interactive elements meet 44px touch target */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-height: unset;
+  }
+}
+
+@layer utilities {
+  .bg-emergency {
+    background-color: #dc2626;
+  }
+
+  .text-emergency {
+    color: #dc2626;
+  }
+
+  .border-emergency {
+    border-color: #dc2626;
+  }
+}
