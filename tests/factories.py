@@ -4,6 +4,7 @@ from uuid import uuid4
 import factory
 
 from hpao.models import (
+    AgentMessage,
     Alert,
     AttendanceRecord,
     Class,
@@ -163,3 +164,19 @@ class AlertFactory(factory.Factory):  # type: ignore[misc]
     acknowledged_by = None
     acknowledged_at = None
     resolved_at = None
+
+
+class AgentMessageFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = AgentMessage
+
+    id = factory.LazyFunction(uuid4)
+    direction = "INBOUND"
+    counterparty = "parent_comms"
+    correlation_id = factory.LazyFunction(uuid4)
+    student_id = None
+    alert_id = None
+    payload = factory.LazyFunction(dict)
+    status = "RECEIVED"
+    error = None
+    sent_at = None

@@ -14,8 +14,9 @@ Living doc. Update after each phase ships.
 - ✅ **Phase 4** — Real-time layer (other agent; 4a + 4b + 4c shipped)
 - ✅ **Phase 5a** — Policies + chunks + rules schema (other agent; rule evaluator still to come)
 - ✅ **Phase 6** — Alerts + 15-min restroom rule (complete)
-- ⏭ **Phase 5b** — Policy ingestion + rule evaluator (other agent's likely next)
-- ⏭ **Phase 8** — Inter-agent boundary endpoints (next demo-critical step)
+- ✅ **Phase 5b** — Rule expression evaluator + idempotent seed (other agent)
+- ✅ **Phase 5c** — Policy embedding pipeline + pgvector RAG search (other agent)
+- ✅ **Phase 8** — Inter-agent boundary endpoints (complete)
 
 ## All phases
 
@@ -26,10 +27,10 @@ Living doc. Update after each phase ships.
 | 2 | Attendance core | ✅ done | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
 | 3 | Hall passes | ✅ done | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
 | 4 | Real-time layer | ✅ done (other agent) | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
-| 5 | Policy ingestion + rule engine | 🔄 5a done (other agent) | `policies`, `policy_chunks` (pgvector), `policy_rules` schema landed; ingestion CLI + evaluator service still to come |
+| 5 | Policy ingestion + rule engine | ✅ done (other agent) | `policies`, `policy_chunks` (pgvector), `policy_rules`, evaluator, embedding pipeline, RAG search |
 | 6 | Alerts + threshold detection | ✅ done | `alerts`, raise/ack/resolve, partial unique on OPEN per (student, rule), 15-min restroom detect_overdue_passes wired |
 | 7 | Agent layer | ⏭ | OpenAI Codex agent loop + tool surface (attendance, hallpass, rules, policy, alert, relay) |
-| 8 | Inter-agent boundary | ⏭ | REST endpoints + HMAC-signed outbound webhook to parent-comms agent |
+| 8 | Inter-agent boundary | ✅ done | REST endpoints + HMAC-signed outbound webhook to parent-comms agent |
 | 9 | Audit + observability | ⏭ | `audit_log`, structured logging, LLM token budget + circuit breaker |
 
 ## Critical path for hackathon demo

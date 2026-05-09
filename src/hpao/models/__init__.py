@@ -1,3 +1,8 @@
+from hpao.models.agent_message import (
+    AGENT_MESSAGE_DIRECTIONS,
+    AGENT_MESSAGE_STATUSES,
+    AgentMessage,
+)
 from hpao.models.alert import ALERT_SEVERITIES, ALERT_STATUSES, Alert
 from hpao.models.attendance_record import (
     ATTENDANCE_SOURCES,
@@ -25,6 +30,8 @@ from hpao.models.student import GRADE_LEVELS, Student
 from hpao.models.user import USER_ROLES, User
 
 __all__ = [
+    "AGENT_MESSAGE_DIRECTIONS",
+    "AGENT_MESSAGE_STATUSES",
     "ALERT_SEVERITIES",
     "ALERT_STATUSES",
     "ATTENDANCE_SOURCES",
@@ -36,6 +43,7 @@ __all__ = [
     "POLICY_RULE_SEVERITIES",
     "POLICY_SCOPES",
     "USER_ROLES",
+    "AgentMessage",
     "Alert",
     "AttendanceRecord",
     "Class",
