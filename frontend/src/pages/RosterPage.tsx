@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Settings, Clock, Users, UserCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { CheckedOutCard } from '../components/CheckedOutCard';
-import { EmergencyLockButton } from '../components/EmergencyLockButton';
 import { ApiError, getRoster, hydrateActivePasses } from '../api/client';
 import { useRealtime } from '../api/realtime';
 import type { RosterApi, StudentApi } from '../api/types';
@@ -219,13 +218,6 @@ export function RosterPage() {
           </form>
         </section>
       </main>
-
-      {/* Emergency Lock - fixed bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 p-3 bg-white border-t border-gray-100 sm:p-4">
-        <div className="max-w-5xl mx-auto">
-          <EmergencyLockButton variant="full-width" />
-        </div>
-      </div>
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { Settings, HelpCircle, User, Sparkles, Calendar } from 'lucide-react';
 import { listSessions, ApiError } from '../api/client';
 import type { ClassPeriodApi } from '../api/types';
 import { useApp } from '../context/AppContext';
-import { EmergencyLockButton } from '../components/EmergencyLockButton';
 
 function ClassCard({ period, onClick }: { period: ClassPeriodApi; onClick: () => void }) {
   const isSuggested = period.type === 'suggested';
@@ -202,11 +201,6 @@ export function ClassSelectPage() {
           <span>Today's schedule</span>
         </div>
       </main>
-
-      {/* Emergency Lock - fixed bottom right */}
-      <div className="fixed bottom-6 right-6 z-20">
-        <EmergencyLockButton variant="default" />
-      </div>
     </div>
   );
 }
