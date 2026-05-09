@@ -5,17 +5,18 @@ Living doc. Update after each phase ships.
 ## Status
 
 - ✅ **Phase 0** — TDD harness + bootstrap (pushed)
-- 🔄 **Phase 1** — Domain models (in progress)
+- ✅ **Phase 1** — Domain models (complete)
   - ✅ 1a: Persistence scaffolding (`d493122`)
   - ✅ 1b: Schools + Students (`110d7d0`)
-  - ⏭ 1c: Users + Classes + Enrollments + Class Sessions
+  - ✅ 1c: Users + Classes + Enrollments + Class Sessions
+- ⏭ **Phase 2** — Attendance core (next)
 
 ## All phases
 
 | # | Phase | Status | Adds |
 |---|---|---|---|
 | 0 | TDD harness + bootstrap | ✅ done | pyproject, ruff/mypy, pre-commit gate, CI, docker-compose, CLAUDE.md |
-| 1 | Domain models | 🔄 partial | Schools+Students done; Users, Classes, Enrollments, Class Sessions remaining |
+| 1 | Domain models | ✅ done | Schools, Students, Users, Classes, Enrollments, Class Sessions |
 | 2 | Attendance core | ⏭ | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
 | 3 | Hall passes | ⏭ | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
 | 4 | Real-time layer | ⏭ | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
@@ -52,4 +53,4 @@ Phase 9 is post-hackathon unless judges care about audit trails.
 
 ## Currently working on
 
-**Phase 1c** — Users (TEACHER/ADMIN/COUNSELOR/NURSE), Classes, ClassEnrollments (M2M with UNIQUE per class+student), ClassSessions (UNIQUE per class+date). One migration (`0002`), one commit.
+Phase 1 complete. Ready to start **Phase 2 — Attendance core** when given the go-ahead. Phase 2 plan: `attendance_records` table (one row per session × student, status enum, source enum, FK to class_sessions + students), service layer with idempotent record/edit, integration tests for the (session, student) UNIQUE invariant and source tracking.
