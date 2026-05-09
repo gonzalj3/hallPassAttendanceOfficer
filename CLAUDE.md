@@ -25,6 +25,15 @@ Test gate: 292 tests on `main`, full suite green. Pre-commit runs unit on commit
 
 ## Quick start
 
+**Prerequisites** (full table with per-OS install hints in `README.md` → Prerequisites):
+
+| Tool | Version | Pinned in |
+|---|---|---|
+| Python | >= 3.12 | `pyproject.toml`, `.python-version`, `.tool-versions` |
+| Node.js | >= 20 | `frontend/package.json` engines, `outbound-voice-agent/package.json` engines, `.tool-versions` |
+| Docker (Engine 20.10+, Compose v2) | — | runtime requirement; not version-pinned in repo |
+| OpenAI API key | — | needed for Phase 5c embeddings + Phase 7 agent + Outbound Voice Agent; tests stub it |
+
 ```bash
 git clone <repo> && cd hallPassAttendanceOfficer
 make install          # python3 -m venv .venv && pip install -e ".[dev]" && pre-commit install

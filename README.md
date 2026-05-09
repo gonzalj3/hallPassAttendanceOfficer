@@ -61,6 +61,37 @@ flowchart LR
 ```
 
 
+## Prerequisites
+
+Pinned versions live in `pyproject.toml` (`requires-python = ">=3.12"`), `.python-version`, `.tool-versions`, `frontend/package.json` (`engines`), and `outbound-voice-agent/package.json` (`engines`). The full matrix:
+
+| Tool | Required version | Why | Quick install |
+|---|---|---|---|
+| **Python** | 3.12 or newer (3.13 also tested) | Backend runtime + alembic + pytest | macOS: `brew install python@3.12` · Linux: `apt install python3.12 python3.12-venv` · Windows: [python.org installer](https://www.python.org/downloads/) · pyenv: `pyenv install 3.12 && pyenv local 3.12` (reads `.python-version`) · asdf: `asdf install` (reads `.tool-versions`) |
+| **pip** | 24+ | Resolves `pyproject.toml` extras | Bundled with Python; `python3 -m pip install --upgrade pip` |
+| **Node.js** | 20.x or newer | Frontend (Vite) + Outbound Voice Agent | macOS: `brew install node@20` · nvm: `nvm install 20 && nvm use 20` · asdf: `asdf install` |
+| **npm** | 10+ | Bundled with Node 20+ | (comes with Node) |
+| **Docker Desktop** / Docker Engine | 20.10+ with Compose v2 | Local Postgres 16 + pgvector via `docker-compose.yml` | macOS / Windows: [Docker Desktop](https://www.docker.com/products/docker-desktop/) · Linux: `apt install docker.io docker-compose-plugin` |
+| **PostgreSQL** | 16 + pgvector extension | Database. Pulled automatically as the `pgvector/pgvector:pg16` image — no host install needed when you use Docker | (handled by `docker compose up db`) |
+| **OpenAI API key** | — | Phase 5c policy embeddings + Phase 7 agent + Outbound Voice Agent. Tests stub it out. | Generate at [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| **git** | 2.30+ | Standard | Comes with Xcode CLI / `apt install git` / Git for Windows |
+
+`make`, `curl`, and a POSIX shell (the `quickstart.sh` script targets Bash 4+ / Zsh) round out the system tooling. Everything else is Python-managed inside `.venv/` or Node-managed inside `frontend/node_modules/` and `outbound-voice-agent/node_modules/` — no global installs needed.
+
+> If you're using **pyenv**, `.python-version` will trigger an auto-install on first `cd`. If you're using **asdf**, `.tool-versions` covers both Python and Node — run `asdf install` once at the repo root.
+
+### Verifying your environment
+
+```bash
+python3 --version    # should print Python 3.12.x or 3.13.x
+node --version       # should print v20.x or higher
+npm --version        # should print 10.x or higher
+docker --version     # any 20.10+ release
+docker compose version
+```
+
+If any of those fail, fix that tool before running `quickstart.sh` — it doesn't probe versions and will surface the failure deeper in the install where the message is harder to read.
+
 ## Quick Start
 
 Create the demo environment file and add your OpenAI API key:
@@ -162,5 +193,20 @@ Outbound voice demo endpoints:
 | `POST /session` | Exchange browser SDP for an OpenAI Realtime WebRTC answer |
 | `POST /conversation-log` | Append transcript rows to the demo datastore |
 | `POST /attendance-excuse` | Append confirmed guardian explanation to the demo datastore |
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `python3: command not found` or version < 3.12 | System Python is older or not on `PATH` | Install Python 3.12 (see Prerequisites). On macOS, `brew install python@3.12` then re-open the shell. |
+| `pip install -e ".[dev]"` fails on `cryptography` / `cffi` | Missing build toolchain on Linux | `sudo apt install build-essential libssl-dev libffi-dev python3-dev` |
+| `Cannot connect to the Docker daemon` | Docker Desktop / dockerd not running | Start Docker Desktop (macOS/Windows) or `sudo systemctl start docker` (Linux). |
+| `pytest tests/integration` errors with `Task ... attached to a different loop` | You're running an old asyncpg test harness | Make sure `make install` completed and that you're invoking the venv's pytest (`.venv/bin/pytest`). |
+| `alembic upgrade head` says `Multiple head revisions` | Two parallel migrations branched from the same parent | `alembic heads` to see the split, then update one migration's `down_revision` to the other (we hit this once during the hackathon — see commit history of `alembic/versions/0007_*`). |
+| Frontend `npm install` fails | Node version below 20 | `nvm install 20 && nvm use 20` (or `asdf install`). The `engines` field in `frontend/package.json` will refuse to install on Node < 20. |
+| Frontend loads but `/api/*` calls 401/CORS-fail | Backend not running, or `VITE_API_URL` wrong | Confirm the backend is at `http://localhost:8000`; in another terminal `curl http://localhost:8000/healthz`. CORS for `localhost:*` is always allowed; if you point Vite at a non-localhost URL, set `FRONTEND_ORIGIN` in `.env`. |
+| Outbound Voice Agent: WebRTC fails with "permission denied" | Browser mic permission revoked | Check browser settings; Chrome's site permissions are at `chrome://settings/content/microphone`. |
+| `OPENAI_API_KEY` not set / `openai.AuthenticationError` | Empty / expired key | Edit `.env`, set `OPENAI_API_KEY=sk-...`. The `quickstart.sh` will refuse to start without it. |
+| Migration fails after `git pull` | Schema drifted between your DB and the new migration | `docker compose down -v` to wipe the dev volume, then `make db-up && alembic upgrade head` to start fresh. **Only do this on the dev DB.** |
 
 ## Known Limitations
