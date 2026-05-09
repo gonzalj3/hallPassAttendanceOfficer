@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { loadAttendanceCase } from "./src/attendance-data.mjs";
 import { appendConversationRows } from "./src/conversation-log.mjs";
@@ -139,40 +140,47 @@ async function serveStatic(req, res) {
   }
 }
 
-const server = createServer(async (req, res) => {
-  try {
-    if (req.method === "POST" && req.url === "/session") {
-      await createRealtimeCall(req, res);
-      return;
+export function createAppServer() {
+  return createServer(async (req, res) => {
+    try {
+      if (req.method === "POST" && req.url === "/session") {
+        await createRealtimeCall(req, res);
+        return;
+      }
+
+      if (req.method === "GET" && req.url === "/case") {
+        await handleCase(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && req.url === "/conversation-log") {
+        await handleConversationLog(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && req.url === "/attendance-excuse") {
+        await handleAttendanceExcuse(req, res);
+        return;
+      }
+
+      if (req.method === "GET") {
+        await serveStatic(req, res);
+        return;
+      }
+
+      sendJson(res, 405, { error: "Method not allowed" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      sendJson(res, 500, { error: message });
     }
+  });
+}
 
-    if (req.method === "GET" && req.url === "/case") {
-      await handleCase(req, res);
-      return;
-    }
+const isMainModule = import.meta.url === pathToFileURL(process.argv[1] ?? "").href;
 
-    if (req.method === "POST" && req.url === "/conversation-log") {
-      await handleConversationLog(req, res);
-      return;
-    }
-
-    if (req.method === "POST" && req.url === "/attendance-excuse") {
-      await handleAttendanceExcuse(req, res);
-      return;
-    }
-
-    if (req.method === "GET") {
-      await serveStatic(req, res);
-      return;
-    }
-
-    sendJson(res, 405, { error: "Method not allowed" });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    sendJson(res, 500, { error: message });
-  }
-});
-
-server.listen(PORT, () => {
-  console.log(`Realtime voice prototype listening on http://localhost:${PORT}`);
-});
+if (isMainModule) {
+  const server = createAppServer();
+  server.listen(PORT, () => {
+    console.log(`Realtime voice prototype listening on http://localhost:${PORT}`);
+  });
+}
