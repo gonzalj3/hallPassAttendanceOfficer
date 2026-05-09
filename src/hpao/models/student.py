@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from hpao.db import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from hpao.models.class_enrollment import ClassEnrollment
     from hpao.models.school import School
 
 
@@ -51,6 +52,9 @@ class Student(Base, TimestampMixin):
     enrolled_at: Mapped[date] = mapped_column(Date, nullable=False)
 
     school: Mapped[School] = relationship(back_populates="students")
+    enrollments: Mapped[list[ClassEnrollment]] = relationship(
+        back_populates="student", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Student {self.last_name!r}, {self.first_name!r} ({self.grade_level})>"
