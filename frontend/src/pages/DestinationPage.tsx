@@ -13,7 +13,6 @@ import {
   Users,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { mockStudents } from '../data/mockData';
 import type { Destination } from '../types';
 
 interface DestinationCardProps {
@@ -171,10 +170,14 @@ export function DestinationPage() {
     setSelectedDestination,
   } = useApp();
 
-  const student =
-    selectedStudent ??
-    mockStudents.find(s => s.id === studentId) ??
-    mockStudents[0];
+  // selectedStudent flows in from RosterPage; if a user deep-linked here,
+  // bounce them back to /classes so they can pick a class first.
+  if (!selectedStudent) {
+    navigate('/classes', { replace: true });
+    return null;
+  }
+  const student = selectedStudent;
+  void studentId; // URL parameter is informational only
 
   const firstName = student.name.split(' ')[0];
 

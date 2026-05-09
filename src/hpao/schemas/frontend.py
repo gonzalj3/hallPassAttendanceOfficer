@@ -38,6 +38,8 @@ class StudentOut(_CamelBase):
 
 class ClassPeriodOut(_CamelBase):
     id: UUID = Field(description="ClassSession id — what /api/sessions/{id}/students keys off")
+    class_id: UUID = Field(serialization_alias="classId")
+    school_id: UUID = Field(serialization_alias="schoolId")
     name: str
     subject: str
     period: str

@@ -3,7 +3,9 @@ export type Destination =
   | 'OFFICE'
   | 'NURSE'
   | 'HALLWAY'
-  | 'CLASSROOM';
+  | 'CLASSROOM'
+  | 'COUNSELOR'
+  | 'OTHER';
 
 export type AttendanceStatus =
   | 'PRESENT'

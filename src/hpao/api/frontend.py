@@ -145,6 +145,8 @@ async def _session_to_period(
     student_count = await _student_count_for_class(db, cls.id)
     return ClassPeriodOut(
         id=session.id,
+        class_id=cls.id,
+        school_id=cls.school_id,
         name=cls.name,
         subject=cls.subject or "",
         period=cls.period,

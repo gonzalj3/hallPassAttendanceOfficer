@@ -8,9 +8,11 @@ import {
   Stethoscope,
   Footprints,
   DoorOpen,
+  AlertCircle,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import type { Destination } from '../types';
+import type { Destination, HallPass } from '../types';
+import { ApiError, issueHallPass } from '../api/client';
 
 function getDestinationIcon(destination: Destination | null) {
   switch (destination) {
@@ -40,61 +42,96 @@ export function PassActivePage() {
     selectedStudent,
     selectedDestination,
     selectedSession,
-    addHallPass,
     setSelectedStudent,
     setSelectedDestination,
   } = useApp();
 
-  const [started, setStarted] = useState(false);
-  const [departureTime] = useState(new Date());
-  const hasAddedPass = useRef(false);
+  const [pass, setPass] = useState<HallPass | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const hasIssued = useRef(false);
   const DURATION_MS = 4000;
 
-  // Add the hall pass once on mount
+  // Issue the pass exactly once on mount.
   useEffect(() => {
-    if (!hasAddedPass.current && selectedStudent && selectedDestination) {
-      hasAddedPass.current = true;
-      const now = new Date();
-      addHallPass({
-        id: `pass-${Date.now()}`,
-        studentId: selectedStudent.id,
-        studentName: selectedStudent.name,
-        destination: selectedDestination,
-        checkedOutAt: now,
-        expectedReturnAt: new Date(now.getTime() + 15 * 60 * 1000),
-        status: 'ACTIVE',
-      });
+    if (hasIssued.current) return;
+    if (!selectedStudent || !selectedDestination || !selectedSession) {
+      navigate('/classes', { replace: true });
+      return;
     }
+    hasIssued.current = true;
+
+    issueHallPass({
+      studentId: selectedStudent.id,
+      sessionId: selectedSession.id,
+      destination: selectedDestination,
+    })
+      .then((p) => {
+        setPass(p);
+      })
+      .catch((e: unknown) => {
+        const msg =
+          e instanceof ApiError ? `${e.status} ${e.message}` : (e as Error).message;
+        setError(msg);
+      });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger CSS transition on next frame so the browser sees 0→100
+  // Progress bar + auto-return — only runs after the pass actually issues.
   useEffect(() => {
-    const raf = requestAnimationFrame(() => setStarted(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  // Auto-navigate after 4s
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      handleReturn();
-    }, DURATION_MS);
-    return () => clearTimeout(timeout);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!pass) return;
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min((elapsed / DURATION_MS) * 100, 100);
+      setProgress(pct);
+      if (pct >= 100) clearInterval(interval);
+    }, 50);
+    const timeout = setTimeout(() => handleReturn(), DURATION_MS);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [pass]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleReturn = () => {
-    const sessionId = selectedSession?.id ?? 'session-3';
+    const sessionId = selectedSession?.id;
     setSelectedStudent(null);
     setSelectedDestination(null);
-    navigate(`/roster/${sessionId}`);
+    if (sessionId) navigate(`/roster/${sessionId}`);
+    else navigate('/classes');
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
+  const formatTime = (date: Date) =>
+    date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+  if (error) {
+    return (
+      <div
+        className="min-h-screen font-sans flex items-center justify-center p-4"
+        style={{ background: '#f0f0ea' }}
+      >
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 rounded-full bg-red-50 flex items-center justify-center">
+              <AlertCircle size={48} className="text-red-600" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2 text-center">
+            Couldn't issue pass
+          </h1>
+          <p className="text-gray-600 text-sm text-center mb-6">{error}</p>
+          <button
+            onClick={handleReturn}
+            className="w-full flex items-center justify-center gap-2 py-3 text-white font-semibold rounded-lg min-h-[44px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
+            style={{ backgroundColor: '#079da8' }}
+          >
+            <ArrowLeft size={18} />
+            Back to Roster
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -104,7 +141,6 @@ export function PassActivePage() {
       }}
     >
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        {/* Checkmark Icon */}
         <div className="flex justify-center mb-6">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center"
@@ -114,15 +150,16 @@ export function PassActivePage() {
           </div>
         </div>
 
-        {/* Title */}
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-black text-gray-900 mb-2">Pass Active!</h1>
-          <p className="text-gray-500">Please check back in when you return.</p>
+          <h1 className="text-3xl font-black text-gray-900 mb-2">
+            {pass ? 'Pass Active!' : 'Issuing pass…'}
+          </h1>
+          <p className="text-gray-500">
+            {pass ? 'Please check back in when you return.' : ''}
+          </p>
         </div>
 
-        {/* Info Cards */}
         <div className="grid grid-cols-2 gap-3 mb-6">
-          {/* Student Card */}
           <div
             className="rounded-xl p-4 border"
             style={{ backgroundColor: '#e8f5f6', borderColor: '#a3d9dd' }}
@@ -135,7 +172,6 @@ export function PassActivePage() {
             </p>
           </div>
 
-          {/* Destination Card */}
           <div
             className="rounded-xl p-4 border"
             style={{ backgroundColor: '#e8f5f6', borderColor: '#a3d9dd' }}
@@ -146,36 +182,32 @@ export function PassActivePage() {
             <div className="flex items-center gap-2">
               {getDestinationIcon(selectedDestination)}
               <div>
-                <p className="font-bold text-gray-900 text-sm">{formatTime(departureTime)}</p>
+                <p className="font-bold text-gray-900 text-sm">
+                  {pass ? formatTime(pass.checkedOutAt) : '—'}
+                </p>
                 <p className="text-xs text-gray-500">Departure</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Progress Bar */}
         <div className="mb-3">
           <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full rounded-full"
-              style={{
-                width: started ? '100%' : '0%',
-                backgroundColor: '#079da8',
-                transition: `width ${DURATION_MS}ms linear`,
-              }}
+              className="h-full rounded-full transition-none"
+              style={{ width: `${progress}%`, backgroundColor: '#079da8' }}
             />
           </div>
         </div>
 
-        <p className="text-center text-sm text-gray-400 mb-5">Returning to Roster...</p>
+        <p className="text-center text-sm text-gray-400 mb-5">
+          {pass ? 'Returning to Roster…' : 'Talking to backend…'}
+        </p>
 
-        {/* Return Button */}
         <button
           onClick={handleReturn}
           className="w-full flex items-center justify-center gap-2 py-3 text-white font-semibold rounded-lg min-h-[44px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 active:opacity-90"
           style={{ backgroundColor: '#079da8' }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#068090')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#079da8')}
         >
           <ArrowLeft size={18} />
           Return Now

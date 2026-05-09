@@ -1,49 +1,40 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import type { AppContextType, AppState, ClassPeriod, HallPass, Student, Destination } from '../types';
-import { createInitialHallPasses } from '../data/mockData';
+import type { ClassPeriodApi, StudentApi } from '../api/types';
+import type { Destination } from '../types';
+
+// Navigation-only state. Active passes are owned by RosterPage and
+// re-fetched from the API rather than mirrored here.
+interface AppState {
+  selectedSession: ClassPeriodApi | null;
+  emergencyLock: boolean;
+  selectedStudent: StudentApi | null;
+  selectedDestination: Destination | null;
+}
+
+interface AppContextType extends AppState {
+  setSelectedSession: (session: ClassPeriodApi | null) => void;
+  setEmergencyLock: (locked: boolean) => void;
+  setSelectedStudent: (student: StudentApi | null) => void;
+  setSelectedDestination: (destination: Destination | null) => void;
+}
 
 const AppContext = createContext<AppContextType | null>(null);
 
-const initialState: AppState = {
-  selectedSession: null,
-  activePasses: createInitialHallPasses(),
-  emergencyLock: false,
-  selectedStudent: null,
-  selectedDestination: null,
-};
-
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [selectedSession, setSelectedSessionState] = useState<ClassPeriod | null>(
-    initialState.selectedSession
-  );
-  const [activePasses, setActivePasses] = useState<HallPass[]>(initialState.activePasses);
-  const [emergencyLock, setEmergencyLockState] = useState(initialState.emergencyLock);
-  const [selectedStudent, setSelectedStudentState] = useState<Student | null>(
-    initialState.selectedStudent
-  );
-  const [selectedDestination, setSelectedDestinationState] = useState<Destination | null>(
-    initialState.selectedDestination
-  );
+  const [selectedSession, setSelectedSessionState] = useState<ClassPeriodApi | null>(null);
+  const [emergencyLock, setEmergencyLockState] = useState(false);
+  const [selectedStudent, setSelectedStudentState] = useState<StudentApi | null>(null);
+  const [selectedDestination, setSelectedDestinationState] = useState<Destination | null>(null);
 
-  const setSelectedSession = useCallback((session: ClassPeriod | null) => {
+  const setSelectedSession = useCallback((session: ClassPeriodApi | null) => {
     setSelectedSessionState(session);
-  }, []);
-
-  const addHallPass = useCallback((pass: HallPass) => {
-    setActivePasses((prev) => [...prev, pass]);
-  }, []);
-
-  const returnHallPass = useCallback((passId: string) => {
-    setActivePasses((prev) =>
-      prev.map((p) => (p.id === passId ? { ...p, status: 'RETURNED' as const } : p))
-    );
   }, []);
 
   const setEmergencyLock = useCallback((locked: boolean) => {
     setEmergencyLockState(locked);
   }, []);
 
-  const setSelectedStudent = useCallback((student: Student | null) => {
+  const setSelectedStudent = useCallback((student: StudentApi | null) => {
     setSelectedStudentState(student);
   }, []);
 
@@ -53,13 +44,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value: AppContextType = {
     selectedSession,
-    activePasses,
     emergencyLock,
     selectedStudent,
     selectedDestination,
     setSelectedSession,
-    addHallPass,
-    returnHallPass,
     setEmergencyLock,
     setSelectedStudent,
     setSelectedDestination,
