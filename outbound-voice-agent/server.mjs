@@ -82,16 +82,18 @@ function getOpenAIKey() {
 async function createRealtimeCall(req, res) {
   const apiKey = getOpenAIKey();
   const caseData = await loadAttendanceCase();
+  const url = new URL(req.url ?? "/session", `http://${req.headers.host ?? "localhost"}`);
+  const scenario = url.searchParams.get("scenario") ?? "absentee";
   const sdp = await readRequestBody(req);
   const form = new FormData();
   form.set("sdp", sdp);
-  form.set("session", JSON.stringify(buildSessionConfig(caseData)));
+  form.set("session", JSON.stringify(buildSessionConfig(caseData, { scenario })));
 
   const response = await fetch(API_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "OpenAI-Safety-Identifier": process.env.SAFETY_IDENTIFIER ?? "realtime-voice-turns-local"
+      "OpenAI-Safety-Identifier": process.env.SAFETY_IDENTIFIER ?? "outbound-voice-agent-local"
     },
     body: form
   });
@@ -171,7 +173,7 @@ export function createAppServer() {
         return;
       }
 
-      if (req.method === "POST" && req.url === "/session") {
+      if (req.method === "POST" && req.url?.startsWith("/session")) {
         await createRealtimeCall(req, res);
         return;
       }

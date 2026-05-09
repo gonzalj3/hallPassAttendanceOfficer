@@ -1,4 +1,4 @@
-# Realtime Voice Turns
+# Outbound Voice Agent
 
 A tiny browser prototype for a turn-based attendance-office call with OpenAI Realtime.
 
@@ -7,7 +7,7 @@ The prototype uses `gpt-realtime-2` over WebRTC. The session is configured for t
 ## Setup
 
 ```bash
-cd /Users/jonathannew/Active-Work/Code/hallPassAttendanceOfficer/realtime-voice-turns
+cd /Users/jonathannew/Active-Work/Code/hallPassAttendanceOfficer/outbound-voice-agent
 cp .env.example .env
 # Add your OpenAI API key to .env
 npm start

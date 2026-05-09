@@ -42,7 +42,7 @@ test("session config scripts the attendance call objective", async () => {
   const config = buildSessionConfig(caseData);
 
   assert.match(config.instructions, /attendance officer/i);
-  assert.match(config.instructions, /per-call response instruction/i);
+  assert.match(config.instructions, /Required issue sentence for this call/i);
   assert.match(config.instructions, /valid reason/i);
   assert.match(config.instructions, /Spanish/);
   assert.match(config.instructions, /confirm your summary/i);
@@ -62,9 +62,28 @@ test("session config requires the exact bilingual Abe opening", () => {
     /Hello this is Abe calling from the Austin High School\. Is this Morgan Johnson\?/
   );
   assert.match(config.instructions, /repeat the same opening statement in Spanish/i);
-  assert.match(config.instructions, /After confirming the guardian identity, say only that supplied issue sentence/i);
+  assert.match(config.instructions, /After confirming the guardian identity, say exactly the full required issue sentence in one speaking turn/i);
+  assert.match(config.instructions, /Do not say the issue sentence is missing/i);
   assert.match(config.instructions, /absence or hall pass concern/i);
   assert.match(config.instructions, /language spoken by the person/i);
+});
+
+test("session config embeds the selected issue sentence durably", () => {
+  const caseData = {
+    parent_name: "Morgan Johnson",
+    student_name: "Avery Johnson"
+  };
+  const absenteeConfig = buildSessionConfig(caseData, { scenario: "absentee" });
+  const hallPassConfig = buildSessionConfig(caseData, { scenario: "hallPass" });
+
+  assert.match(
+    absenteeConfig.instructions,
+    /Required issue sentence for this call: "Avery Johnson was absent today\. Please tell me, is there a valid reason for the absence\?"/
+  );
+  assert.match(
+    hallPassConfig.instructions,
+    /Required issue sentence for this call: "Avery Johnson has had 14 hall passes in the last 10 school days for a total of 4 hours absent\. Do you want to share a reason for those hall passes, or should I record that no excuse was provided\?"/
+  );
 });
 
 test("session config hardens short yes no language detection", () => {

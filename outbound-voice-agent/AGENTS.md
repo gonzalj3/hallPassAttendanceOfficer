@@ -1,4 +1,4 @@
-# Realtime Voice Turns
+# Outbound Voice Agent
 
 Prototype for turn-based OpenAI Realtime voice interaction.
 

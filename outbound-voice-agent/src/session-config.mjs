@@ -1,6 +1,23 @@
 export const REALTIME_MODEL = "gpt-realtime-2";
 
-function buildAttendanceInstructions(caseData = {}) {
+export const CALL_SCENARIOS = {
+  absentee: {
+    label: "absentee",
+    issueSentence: (caseData) =>
+      `${caseData?.student_name ?? "The student"} was absent today. Please tell me, is there a valid reason for the absence?`
+  },
+  hallPass: {
+    label: "hall pass",
+    issueSentence: (caseData) =>
+      `${caseData?.student_name ?? "The student"} has had 14 hall passes in the last 10 school days for a total of 4 hours absent. Do you want to share a reason for those hall passes, or should I record that no excuse was provided?`
+  }
+};
+
+export function getCallScenario(scenario) {
+  return CALL_SCENARIOS[scenario] ?? CALL_SCENARIOS.absentee;
+}
+
+function buildAttendanceInstructions(caseData = {}, options = {}) {
   const studentName = caseData.student_name ?? "the student";
   const parentName = caseData.parent_name ?? "the parent or guardian";
   const guardianLanguage = caseData.guardian_language ?? "unknown";
@@ -8,6 +25,8 @@ function buildAttendanceInstructions(caseData = {}) {
   const policyText =
     caseData.policy_text ?? "Students can miss no more than 10 days in a school year.";
   const maxAbsences = caseData.max_absences_per_school_year ?? 10;
+  const scenario = getCallScenario(options.scenario);
+  const issueSentence = scenario.issueSentence(caseData);
 
   return [
     "# Role and Objective",
@@ -21,9 +40,11 @@ function buildAttendanceInstructions(caseData = {}) {
     `Start every new or reset call with this exact English opening: "Hello this is Abe calling from the Austin High School. Is this ${parentName}?"`,
     "Immediately after the English opening, repeat the same opening statement in Spanish.",
     "After the bilingual guardian identity check, use the appropriate language for the rest of the call based on the language spoken by the person.",
-    "The browser sends a per-call response instruction with the exact issue sentence for this call.",
-    "After confirming the guardian identity, say only that supplied issue sentence and ask for the valid reason it requests.",
-    "Do not replace the supplied issue sentence with a different absence or hall pass concern.",
+    `Selected call scenario: ${scenario.label}.`,
+    `Required issue sentence for this call: "${issueSentence}"`,
+    "After confirming the guardian identity, say exactly the full required issue sentence in one speaking turn, then wait for the guardian response.",
+    "Do not say the issue sentence is missing. If you need the issue sentence, use the Required issue sentence line above.",
+    "Do not replace the required issue sentence with a different absence or hall pass concern.",
     "Wait for the parent to finish before responding.",
     "If the parent gives an excuse, summarize it in one sentence and ask them to confirm your summary.",
     "Only after the parent confirms, call submit_attendance_excuse with the confirmed reason.",
@@ -92,7 +113,7 @@ const submitAttendanceExcuseTool = {
   }
 };
 
-export function buildSessionConfig(caseData) {
+export function buildSessionConfig(caseData, options = {}) {
   return {
     type: "realtime",
     model: REALTIME_MODEL,
@@ -117,6 +138,6 @@ export function buildSessionConfig(caseData) {
     },
     tools: [submitAttendanceExcuseTool],
     tool_choice: "auto",
-    instructions: buildAttendanceInstructions(caseData)
+    instructions: buildAttendanceInstructions(caseData, options)
   };
 }

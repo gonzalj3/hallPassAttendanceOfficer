@@ -41,13 +41,19 @@ function apiPath(path) {
 const callScenarios = {
   absentee: {
     idleLabel: "Start Absentee Call",
-    caseSummary: (caseData) => `${caseData.student_name} | ${caseData.absences_this_year} absence(s) this year | Policy max ${caseData.max_absences_per_school_year}`,
+    caseSummary: (caseData) => ({
+      title: `${caseData.student_name} absentee call`,
+      detail: `${caseData.absences_this_year} absence(s) this year | Policy max ${caseData.max_absences_per_school_year}`
+    }),
     issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} was absent today. Please tell me, is there a valid reason for the absence?`
   },
   hallPass: {
     idleLabel: "Start Hall Pass Call",
-    caseSummary: (caseData) => `${caseData.student_name} | 14 hall passes in 10 school days | 4 hours outside class`,
-    issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} has had 14 hall passes in the last 10 school days for a total of 4 hours of time outside class. Please tell me, is there a valid reason for this hall pass use?`
+    caseSummary: (caseData) => ({
+      title: `${caseData.student_name} hall pass call`,
+      detail: "14 hall passes in 10 school days | 4 hours absent"
+    }),
+    issueSentence: (caseData) => `${caseData?.student_name ?? "The student"} has had 14 hall passes in the last 10 school days for a total of 4 hours absent. Do you want to share a reason for those hall passes, or should I record that no excuse was provided?`
   }
 };
 
@@ -67,7 +73,7 @@ function buildInitialCallInstructions(scenario = activeScenario) {
     'If the guardian says "yes", continue in English. If the guardian says "sí" or "si", continue in Spanish. If the guardian only says "no", use the datastore preferred language as the language tie-breaker while handling the negative answer appropriately.',
     'If you still cannot tell the preferred language, ask once: "Would you prefer English or Spanish? ¿Prefiere inglés o español?"',
     "After the person confirms they are the guardian, continue in the selected language.",
-    `Then say exactly: "${issueSentence}"`
+    `Then say exactly in one speaking turn and wait for the guardian response: "${issueSentence}"`
   ].join(" ");
 }
 
@@ -233,7 +239,6 @@ async function saveNewMessages() {
 
   await response.json();
   savedMessageCount = messages.length;
-  appendLog("system", "Data Saved.");
 }
 
 function parseFunctionArguments(rawArguments) {
@@ -279,7 +284,6 @@ async function submitAttendanceExcuse(functionCall) {
   }
 
   const result = await response.json();
-  appendLog("system", "Data Saved.");
 
   dataChannel.send(JSON.stringify({
     type: "conversation.item.create",
@@ -350,6 +354,9 @@ function handleRealtimeEvent(rawEvent) {
     case "response.output_audio_transcript.done":
       recordMessage("assistant", event.transcript);
       break;
+    case "conversation.item.input_audio_transcription.completed":
+      recordMessage("parent", event.transcript);
+      break;
     case "conversation.item.done":
       if (event.item?.role === "user") {
         const text = getOutputTranscript(event.item);
@@ -397,7 +404,13 @@ function renderCaseSummary(scenario = activeScenario) {
   if (!activeCase || !isCaseSummaryVisible) return;
 
   const scenarioConfig = callScenarios[scenario] ?? callScenarios.absentee;
-  caseStrip.textContent = scenarioConfig.caseSummary(activeCase);
+  const summary = scenarioConfig.caseSummary(activeCase);
+  const title = document.createElement("strong");
+  const detail = document.createElement("span");
+
+  title.textContent = summary.title;
+  detail.textContent = summary.detail;
+  caseStrip.replaceChildren(title, detail);
   caseStrip.hidden = false;
 }
 
@@ -472,7 +485,7 @@ async function startSession(scenario = "absentee") {
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
-  const sdpResponse = await fetch(apiPath("/session"), {
+  const sdpResponse = await fetch(apiPath(`/session?scenario=${encodeURIComponent(scenario)}`), {
     method: "POST",
     body: offer.sdp,
     headers: {

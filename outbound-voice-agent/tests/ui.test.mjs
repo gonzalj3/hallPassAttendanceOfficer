@@ -4,11 +4,13 @@ import test from "node:test";
 
 const indexPath = new URL("../public/index.html", import.meta.url);
 const appPath = new URL("../public/app.js", import.meta.url);
+const stylesPath = new URL("../public/styles.css", import.meta.url);
 
 test("UI includes a reset call control wired to restart the session", async () => {
-  const [html, app] = await Promise.all([
+  const [html, app, styles] = await Promise.all([
     readFile(indexPath, "utf8"),
-    readFile(appPath, "utf8")
+    readFile(appPath, "utf8"),
+    readFile(stylesPath, "utf8")
   ]);
 
   assert.match(html, /id="resetButton"/);
@@ -25,6 +27,16 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(html, /role="tablist"/);
   assert.match(html, /id="systemTab"/);
   assert.match(html, /id="systemView"/);
+  assert.doesNotMatch(html, /id="submissionTab"/);
+  assert.doesNotMatch(html, /id="submissionView"/);
+  assert.doesNotMatch(html, /Submission Info/);
+  assert.doesNotMatch(html, /contenteditable="true"/);
+  assert.doesNotMatch(html, /data-editable-key/);
+  assert.doesNotMatch(html, /README quick start/);
+  assert.doesNotMatch(html, /README datasets/);
+  assert.doesNotMatch(html, /YOUR VIDEO MUST BE RECORDED WITH LOOM!/);
+  assert.doesNotMatch(html, /Screen capture:/);
+  assert.doesNotMatch(html, /Other track options/);
   assert.match(html, /System architecture/);
   assert.match(html, /Use case processes/);
   assert.match(html, /Use Case: Teacher Records Attendance/);
@@ -73,7 +85,13 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(app, /End Call/);
   assert.match(app, /callScenarios/);
   assert.match(app, /caseSummary/);
-  assert.match(app, /has had 14 hall passes in the last 10 school days for a total of 4 hours of time outside class/);
+  assert.match(app, /absentee call/);
+  assert.match(app, /hall pass call/);
+  assert.match(app, /replaceChildren\(title, detail\)/);
+  assert.match(app, /has had 14 hall passes in the last 10 school days for a total of 4 hours absent/);
+  assert.match(app, /Do you want to share a reason for those hall passes, or should I record that no excuse was provided/);
+  assert.match(app, /one speaking turn and wait for the guardian response/);
+  assert.match(app, /14 hall passes in 10 school days \| 4 hours absent/);
   assert.match(app, /Start Absentee Call/);
   assert.match(app, /Start Hall Pass Call/);
   assert.match(app, /Do not substitute a different attendance issue/);
@@ -81,7 +99,7 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(app, /If the guardian says "yes", continue in English/);
   assert.match(app, /If the guardian says "sí" or "si", continue in Spanish/);
   assert.match(app, /Would you prefer English or Spanish\? ¿Prefiere inglés o español\?/);
-  assert.match(app, /Data Saved/);
+  assert.doesNotMatch(app, /Data Saved/);
   assert.doesNotMatch(app, /data\/output\/conversations\.csv/);
   assert.doesNotMatch(app, /Realtime session created/);
   assert.doesNotMatch(app, /Excuse saved as/);
@@ -89,17 +107,28 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(app, /setMicrophoneListening\(false\)/);
   assert.match(app, /Mic paused/);
   assert.match(app, /transcriptLabelFor/);
+  assert.match(app, /conversation\.item\.input_audio_transcription\.completed/);
   assert.match(app, /assistant: "ABE"/);
   assert.match(app, /parent: "GUARDIAN"/);
   assert.doesNotMatch(app, /stopButton/);
   assert.match(app, /activateTab/);
   assert.match(app, /systemTab\.addEventListener/);
+  assert.doesNotMatch(app, /submissionTab/);
+  assert.doesNotMatch(app, /submissionView/);
+  assert.doesNotMatch(app, /setupEditableSubmissionFields/);
+  assert.doesNotMatch(app, /attendanceOfficerSubmission:/);
   assert.match(app, /toggleTheme/);
   assert.match(app, /attendanceOfficerTheme/);
   assert.match(app, /Hello this is Abe calling from the Austin High School\. Is this/);
   assert.match(app, /apiPath/);
   assert.match(app, /http:\/\/localhost:5178/);
+  assert.match(app, /session\?scenario=/);
   assert.match(app, /startListenOnlySession/);
   assert.match(app, /recvonly/);
   assert.match(app, /Microphone Blocked/);
+  assert.match(styles, /\.controls\s*{[^}]*align-items: center;/s);
+  assert.match(styles, /\.controls\s*{[^}]*align-content: flex-start;/s);
+  assert.match(styles, /\.controls button\s*{[^}]*height: 42px;/s);
+  assert.match(styles, /\.controls button\s*{[^}]*max-height: 42px;/s);
+  assert.match(styles, /\.controls button\s*{[^}]*white-space: nowrap;/s);
 });
