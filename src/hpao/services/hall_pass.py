@@ -17,6 +17,8 @@ DEFAULT_DURATION_MINUTES: dict[str, int] = {
     "COUNSELOR": 30,
     "OFFICE": 30,
     "OTHER": 15,
+    "HALLWAY": 10,  # water fountain / locker — short trip
+    "CLASSROOM": 10,  # delivery / brief teacher meeting
 }
 
 

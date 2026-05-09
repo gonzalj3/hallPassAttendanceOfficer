@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from hpao.api import agent as agent_api
+from hpao.api import frontend as frontend_api
 from hpao.config import Settings, get_settings
 from hpao.realtime.postgres import RealtimeListener, asyncpg_dsn
 from hpao.realtime.websocket import make_realtime_router
@@ -84,10 +85,20 @@ def make_app(
     app.include_router(make_realtime_router(listener))
 
     async def session_dep() -> AsyncIterator[AsyncSession]:
+        # Commit on success, roll back on exception. Without this, every
+        # write endpoint would silently drop its work when the session
+        # closed at request end.
         async with session_factory() as session:
-            yield session
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
+            else:
+                await session.commit()
 
     agent_api.mount(app, session_provider=session_dep, secret=hmac_secret)
+    frontend_api.mount(app, session_provider=session_dep)
 
     return app
 

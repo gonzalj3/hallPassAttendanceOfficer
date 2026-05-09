@@ -22,6 +22,8 @@ HALL_PASS_DESTINATIONS: tuple[str, ...] = (
     "COUNSELOR",
     "OFFICE",
     "OTHER",
+    "HALLWAY",
+    "CLASSROOM",
 )
 
 _STATUSES_LIST = ", ".join(f"'{s}'" for s in HALL_PASS_STATUSES)

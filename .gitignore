@@ -16,3 +16,4 @@ build/
 .testmondata
 .DS_Store
 node_modules
+docker-compose.override.yml

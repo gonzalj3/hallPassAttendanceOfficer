@@ -29,12 +29,17 @@ def test_hall_pass_statuses_enum() -> None:
 
 
 def test_hall_pass_destinations_enum() -> None:
-    assert "RESTROOM" in HALL_PASS_DESTINATIONS
-    assert "NURSE" in HALL_PASS_DESTINATIONS
-    assert "COUNSELOR" in HALL_PASS_DESTINATIONS
-    assert "OFFICE" in HALL_PASS_DESTINATIONS
-    assert "OTHER" in HALL_PASS_DESTINATIONS
-    assert len(HALL_PASS_DESTINATIONS) == 5
+    # HALLWAY + CLASSROOM added in migration 0009 to match the frontend's
+    # destination vocabulary.
+    assert set(HALL_PASS_DESTINATIONS) == {
+        "RESTROOM",
+        "NURSE",
+        "COUNSELOR",
+        "OFFICE",
+        "OTHER",
+        "HALLWAY",
+        "CLASSROOM",
+    }
 
 
 def test_hall_pass_repr_includes_status_and_destination() -> None:

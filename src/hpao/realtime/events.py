@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 Severity = Literal["low", "medium", "high", "critical"]
 AttendanceStatus = Literal["PRESENT", "ABSENT", "TARDY", "EXCUSED", "UNEXCUSED"]
-Destination = Literal["RESTROOM", "NURSE", "COUNSELOR", "OFFICE", "OTHER"]
+Destination = Literal["RESTROOM", "NURSE", "COUNSELOR", "OFFICE", "OTHER", "HALLWAY", "CLASSROOM"]
 
 
 class _EventBase(BaseModel):
