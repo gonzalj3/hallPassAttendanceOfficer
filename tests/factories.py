@@ -1,4 +1,4 @@
-from datetime import date, time
+from datetime import UTC, date, datetime, time, timedelta
 from uuid import uuid4
 
 import factory
@@ -8,6 +8,7 @@ from hpao.models import (
     Class,
     ClassEnrollment,
     ClassSession,
+    HallPass,
     School,
     Student,
     User,
@@ -93,3 +94,19 @@ class AttendanceRecordFactory(factory.Factory):  # type: ignore[misc]
     source = "TEACHER"
     recorded_by = None
     notes = None
+
+
+class HallPassFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = HallPass
+
+    id = factory.LazyFunction(uuid4)
+    student_id = factory.LazyFunction(uuid4)  # override
+    originating_class_session_id = factory.LazyFunction(uuid4)  # override
+    destination = "RESTROOM"
+    reason = None
+    checked_out_at = factory.LazyFunction(lambda: datetime.now(UTC))
+    expected_return_at = factory.LazyFunction(lambda: datetime.now(UTC) + timedelta(minutes=15))
+    checked_in_at = None
+    status = "ACTIVE"
+    issued_by = factory.LazyFunction(uuid4)  # override
