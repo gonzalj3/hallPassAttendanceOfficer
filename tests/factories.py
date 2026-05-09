@@ -9,6 +9,9 @@ from hpao.models import (
     ClassEnrollment,
     ClassSession,
     HallPass,
+    Policy,
+    PolicyChunk,
+    PolicyRule,
     School,
     Student,
     User,
@@ -110,3 +113,37 @@ class HallPassFactory(factory.Factory):  # type: ignore[misc]
     checked_in_at = None
     status = "ACTIVE"
     issued_by = factory.LazyFunction(uuid4)  # override
+
+
+class PolicyFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = Policy
+
+    id = factory.LazyFunction(uuid4)
+    scope = "tea"
+    name = factory.Sequence(lambda n: f"Policy {n}")
+    source_url = None
+    version = "v1"
+    effective_date = factory.LazyFunction(lambda: date(2025, 8, 1))
+
+
+class PolicyChunkFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = PolicyChunk
+
+    id = factory.LazyFunction(uuid4)
+    policy_id = factory.LazyFunction(uuid4)  # override with a real policy id
+    text = factory.Sequence(lambda n: f"Chunk text {n}")
+    embedding = None  # populated in Phase 5c
+
+
+class PolicyRuleFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = PolicyRule
+
+    id = factory.LazyFunction(uuid4)
+    policy_id = factory.LazyFunction(uuid4)  # override
+    rule_key = factory.Sequence(lambda n: f"test.rule.{n}")
+    expression = factory.LazyFunction(lambda: {"op": "noop"})
+    threshold = None
+    severity = "medium"

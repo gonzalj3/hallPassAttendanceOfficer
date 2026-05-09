@@ -11,6 +11,14 @@ from hpao.models.hall_pass import (
     HALL_PASS_STATUSES,
     HallPass,
 )
+from hpao.models.policy import (
+    EMBEDDING_DIM,
+    POLICY_RULE_SEVERITIES,
+    POLICY_SCOPES,
+    Policy,
+    PolicyChunk,
+    PolicyRule,
+)
 from hpao.models.school import School
 from hpao.models.student import GRADE_LEVELS, Student
 from hpao.models.user import USER_ROLES, User
@@ -18,15 +26,21 @@ from hpao.models.user import USER_ROLES, User
 __all__ = [
     "ATTENDANCE_SOURCES",
     "ATTENDANCE_STATUSES",
+    "EMBEDDING_DIM",
     "GRADE_LEVELS",
     "HALL_PASS_DESTINATIONS",
     "HALL_PASS_STATUSES",
+    "POLICY_RULE_SEVERITIES",
+    "POLICY_SCOPES",
     "USER_ROLES",
     "AttendanceRecord",
     "Class",
     "ClassEnrollment",
     "ClassSession",
     "HallPass",
+    "Policy",
+    "PolicyChunk",
+    "PolicyRule",
     "School",
     "Student",
     "User",
