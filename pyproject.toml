@@ -83,5 +83,5 @@ module = "hpao.agent.*"
 strict = false
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*", "factory.*", "freezegun.*", "pgvector.*"]
+module = ["testcontainers.*", "factory.*", "freezegun.*", "pgvector.*", "asyncpg.*"]
 ignore_missing_imports = true

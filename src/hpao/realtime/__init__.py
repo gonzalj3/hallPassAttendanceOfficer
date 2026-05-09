@@ -1,13 +1,12 @@
 """Realtime layer: event taxonomy + pub/sub abstractions.
 
-Phase 4a defines the contract every later phase publishes through:
-  - `RealtimeEvent` discriminated union of the 5 event types HPAO emits.
-  - `channels_for(event)` derives the `school:`/`class:`/`student:` channels
-    each event fans out to.
-  - `RealtimePublisher` Protocol + `InMemoryPublisher` for tests and dev.
+Phase 4a defined the contract: `RealtimeEvent` discriminated union, the
+`channels_for()` school/class/student fan-out, and a `RealtimePublisher`
+Protocol with an in-memory implementation.
 
-Phase 4b will add a `PgNotifyPublisher` (LISTEN/NOTIFY transport) and
-Phase 4c will add the WebSocket fan-out endpoint.
+Phase 4b adds the Postgres LISTEN/NOTIFY transport (`PgNotifyPublisher`,
+`RealtimeListener`). Phase 4c will plug a WebSocket endpoint into the
+listener.
 """
 
 from hpao.realtime.events import (
@@ -22,6 +21,11 @@ from hpao.realtime.events import (
     Severity,
     channels_for,
 )
+from hpao.realtime.postgres import (
+    PgNotifyPublisher,
+    RealtimeListener,
+    asyncpg_dsn,
+)
 from hpao.realtime.publisher import InMemoryPublisher, RealtimePublisher
 
 __all__ = [
@@ -33,8 +37,11 @@ __all__ = [
     "HallpassOverdue",
     "HallpassReturned",
     "InMemoryPublisher",
+    "PgNotifyPublisher",
     "RealtimeEvent",
+    "RealtimeListener",
     "RealtimePublisher",
     "Severity",
+    "asyncpg_dsn",
     "channels_for",
 ]
