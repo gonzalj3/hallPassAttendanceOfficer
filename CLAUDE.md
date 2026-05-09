@@ -2,6 +2,102 @@
 
 Hackathon MVP. **Single school.** Backend + agent that owns attendance, hall passes, and policy compliance, and emits real-time alerts.
 
+## Status (2026-05-09)
+
+| Area | State |
+|---|---|
+| Persistence: schools, students, users, classes, sessions, attendance, hall passes, alerts, agent_messages | ✅ migrations 0001–0008 |
+| Attendance service (`record_attendance`, `list_*`) — idempotent upsert | ✅ |
+| Hall pass service (issue/check-in/overdue) + 15-min restroom default | ✅ |
+| Real-time `LISTEN/NOTIFY` + WebSocket fan-out (other agent) | ✅ |
+| Policy ingestion + pgvector RAG + rule evaluator (other agent) | ✅ |
+| Alerts service + `detect_overdue_passes` (the headline trigger) | ✅ |
+| Inter-agent boundary endpoints (HMAC-signed) | ✅ except `policy-search` + `excuses` (not yet exposed) |
+| Demo dispatcher loop (`detect → dispatch`) + CLI runner | ✅ |
+| OpenAI Codex agent loop wrapping the tool surface | ⏭ optional, post-demo |
+| Audit log + observability hardening | ⏭ optional, post-hackathon |
+
+Test gate: ~258 tests on `main`, full suite green. Pre-commit runs unit on commit, full suite on push.
+
+## Quick start
+
+```bash
+git clone <repo> && cd hallPassAttendanceOfficer
+make install          # python3 -m venv .venv && pip install -e ".[dev]" && pre-commit install
+make db-up            # docker compose up -d db (Postgres 16 + pgvector)
+.venv/bin/alembic upgrade head
+make test             # full suite (Docker required for integration)
+```
+
+Make targets: `install` · `test` · `test-unit` · `test-integration` · `lint` · `fmt` · `type` · `db-up` · `db-down` · `hooks` · `clean`.
+
+Required env (or `.env`):
+
+| Var | Required | Default | Notes |
+|---|---|---|---|
+| `DATABASE_URL` | yes | — | `postgresql+asyncpg://hpao:hpao@localhost:5432/hpao` for local |
+| `APP_ENV` | no | `dev` | |
+| `PARENT_COMMS_URL` | for outbound webhooks | unset | Base URL of the teammate's parent-comms agent |
+| `PARENT_COMMS_SECRET` | for outbound webhooks | unset | Shared HMAC secret; must match parent-comms config |
+| `DISPATCHER_INTERVAL_SECONDS` | no | `30.0` | Drop to `5` for live demo |
+| `OPENAI_API_KEY` | for policy ingestion + agent loop | unset | Used by Phase 5c embeddings and the planned Phase 7 agent. Tests stub it out. |
+| `OPENAI_PROJECT_ID` | no | unset | Optional — pins API calls to a specific OpenAI project |
+| `OPENAI_MODEL` | no | `gpt-4o-mini` | Default chat model for the agent loop |
+| `OPENAI_EMBEDDING_MODEL` | no | `text-embedding-3-small` | Used by Phase 5c policy chunk embedding |
+
+If `PARENT_COMMS_URL` / `_SECRET` are unset, the dispatcher still runs `detect_overdue_passes` (state hygiene) but skips outbound webhooks — useful when the teammate's agent isn't up.
+
+## Demo runbook (the 15-min restroom flow, end-to-end)
+
+Two terminals.
+
+**Terminal 1 — dispatcher loop:**
+```bash
+DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5432/hpao \
+PARENT_COMMS_URL=https://your-teammate-agent.example \
+PARENT_COMMS_SECRET=shared-hmac-secret \
+DISPATCHER_INTERVAL_SECONDS=5 \
+  python -m hpao.cli.dispatcher
+```
+
+CLI flags: `--once` (single cycle, prints summary, exits) · `--interval N` (override loop interval).
+
+**Terminal 2 — issue a hall pass that will trip the alert:**
+```python
+# in a python REPL or seed script
+from hpao.services.hall_pass import issue_pass
+await issue_pass(
+    db,
+    student_id=student.id,
+    originating_class_session_id=session.id,
+    destination="RESTROOM",
+    issued_by=teacher.id,
+    duration_minutes=1,  # 1 min for fast demo (default is 15)
+)
+```
+
+Within `DISPATCHER_INTERVAL_SECONDS` of the pass going overdue, Terminal 1 logs the alert raised + webhook fired. The `agent_messages` table will have `direction=OUTBOUND`, `status=SENT`, `alert_id=<the alert>`.
+
+The signed payload that lands at the teammate's `/notifications`:
+
+```json
+{
+  "correlation_id": "uuid",
+  "event": "alert.raised",
+  "severity": "high",
+  "student_id": "uuid",
+  "guardians": [],
+  "context": {
+    "rule_key": "hallpass.restroom.duration_exceeded",
+    "summary": "Student out of class 17 min (restroom)",
+    "evidence": { "hall_pass_id": "...", "destination": "RESTROOM", "minutes_elapsed": 17 }
+  },
+  "intent": "notify"
+}
+```
+
+Header: `X-HPAO-Signature: hex(hmac_sha256(PARENT_COMMS_SECRET, raw_body))`.
+
 ## What HPAO is (and isn't)
 
 - **Owns**: schools, classes, students, teachers, attendance, hall passes, policy rules, alerts, agent-message log.
@@ -21,41 +117,29 @@ HPAO sits on the **agent boundary** (HTTPS between services), not the **parent b
 
 The parent-comms agent **initiates and receives** all parent/admin conversations. HPAO never contacts parents directly. All boundary calls are HMAC-signed (`X-HPAO-Signature: hex(hmac_sha256(secret, body))`) and idempotent on `correlation_id`.
 
-### HPAO → parent-comms (outbound webhook)
+### HPAO → parent-comms (outbound webhook) ✅ implemented
 
-`POST {parent_comms_base}/notifications`
-
-```json
-{
-  "correlation_id": "uuid",
-  "event": "alert.raised",
-  "severity": "low|medium|high|critical",
-  "student_id": "uuid",
-  "guardians": [
-    {"id": "uuid", "name": "...", "preferred_channel": "sms|email|call", "preferred_language": "en|es"}
-  ],
-  "context": {
-    "rule_key": "restroom.duration_exceeded",
-    "summary": "Student out of class 17 minutes",
-    "evidence": { "hall_pass_id": "...", "checked_out_at": "...", "minutes_elapsed": 17 }
-  },
-  "intent": "notify|request_info|request_exemption_review"
-}
-```
+`POST {parent_comms_base}/notifications` — payload shape shown in **Demo runbook** above.
 
 ### parent-comms → HPAO (HPAO exposes)
 
-- `POST /v1/agent/inbound/parent-message` — log parent-initiated contact, attach to a student.
-- `POST /v1/agent/inbound/parent-response` — relay a parent reply (excuse note, exemption claim) so HPAO can update attendance/alerts.
-- `GET  /v1/agent/student-context/{student_id}` — attendance summary, active alerts, recent hall passes, applicable rules. Use for grounding replies.
-- `GET  /v1/agent/policy-search?q=...` — RAG over ingested policy docs (TEA, district, school). Use this rather than reasoning over policy yourself.
-- `POST /v1/agent/excuses` — submit an excused-absence claim with supporting note; HPAO decides per deterministic rule.
+| Method | Path | State |
+|---|---|---|
+| `POST` | `/v1/agent/inbound/parent-message` | ✅ implemented |
+| `POST` | `/v1/agent/inbound/parent-response` | ✅ implemented |
+| `GET`  | `/v1/agent/student-context/{student_id}?since=YYYY-MM-DD` | ✅ implemented |
+| `GET`  | `/v1/agent/policy-search?q=...` | 🚧 service exists (Phase 5c), HTTP endpoint not yet exposed |
+| `POST` | `/v1/agent/excuses` | 🚧 not yet implemented |
+
+POSTs return `{accepted, agent_message_id, correlation_id, duplicate}`. Same `correlation_id` posted twice → `duplicate=true`, no double-write.
+
+`student-context` returns `{student_id, student_number, grade_level, first_name, last_name, school_id, attendance_summary, active_hall_passes[], open_alerts[]}`.
 
 ## Real-time events
 
-Delivered via WebSocket (dashboards) and outbound webhook (parent-comms, severity ≥ medium).
+Delivered via WebSocket at `/v1/realtime?channel=...` (multi-channel subscribe) and outbound webhook (parent-comms, severity ≥ medium).
 
-Channels: `school:{id}` · `class:{id}` · `student:{id}`
+Channels: `school:{id}` · `class:{id}` · `student:{id}`.
 
 Event types:
 - `attendance.recorded`
@@ -66,33 +150,33 @@ Event types:
 
 ## Data model (essentials)
 
-Every table has `id` (UUIDv7), `created_at`, `updated_at`. State changes append to `audit_log`.
+Every table has `id` (UUIDv4), `created_at`, `updated_at` (TIMESTAMPTZ).
 
-| Table | Key fields |
-|---|---|
-| `students` | `student_number`, `grade_level` |
-| `guardians` | `name`, `phone`, `email`, `preferred_language`, `preferred_channel` |
-| `student_guardians` | M2M with `relationship`, `is_primary` |
-| `teachers` / `users` | `email`, `role`, `name` |
-| `classes` | `teacher_id`, `name`, `period`, `room` |
-| `class_sessions` | `class_id`, `date`, `scheduled_start`, `scheduled_end` |
-| `attendance_records` | `class_session_id`, `student_id`, `status`, `source`, `recorded_by`, `notes` |
-| `hall_passes` | `student_id`, `originating_class_session_id`, `destination`, `reason`, `checked_out_at`, `expected_return_at`, `checked_in_at`, `status`, `issued_by` |
-| `policies` | `scope`, `name`, `source_url`, `version`, `effective_date` |
-| `policy_chunks` | `policy_id`, `text`, `embedding` (pgvector) |
-| `policy_rules` | `policy_id`, `rule_key`, `expression` (JSONB), `threshold`, `severity` |
-| `alerts` | `student_id`, `rule_key`, `severity`, `status`, `acknowledged_by` |
-| `agent_messages` | `direction`, `counterparty`, `student_id`, `payload` (JSONB), `correlation_id`, `status` |
+| Table | Key fields | Notes |
+|---|---|---|
+| `schools` | `name`, `district` | |
+| `students` | `school_id` FK, `student_number`, `grade_level` | UNIQUE(`school_id`, `student_number`) |
+| `users` | `school_id` FK, `email`, `role`, `first_name`, `last_name` | role ∈ TEACHER/ADMIN/COUNSELOR/NURSE |
+| `classes` | `school_id` FK, `teacher_id` FK, `name`, `period`, `room` | |
+| `class_enrollments` | `class_id`, `student_id`, `enrolled_at` | UNIQUE(class, student) |
+| `class_sessions` | `class_id` FK, `date`, `scheduled_start`, `scheduled_end` | UNIQUE(class, date) |
+| `attendance_records` | `class_session_id` FK, `student_id` FK, `status`, `source`, `recorded_by`, `notes` | UNIQUE(session, student) |
+| `hall_passes` | `student_id`, `originating_class_session_id`, `destination`, `checked_out_at`, `expected_return_at`, `checked_in_at`, `status`, `issued_by` | Partial UNIQUE(student) WHERE `status='ACTIVE'` |
+| `policies` / `policy_chunks` / `policy_rules` | RAG corpus + structured rule expressions | pgvector embeddings on chunks |
+| `alerts` | `student_id`, `rule_key`, `severity`, `status`, `context` JSONB, `acknowledged_by` | Partial UNIQUE(student, rule_key) WHERE `status='OPEN'` |
+| `agent_messages` | `direction`, `counterparty`, `correlation_id`, `student_id?`, `alert_id?`, `payload` JSONB, `status` | UNIQUE(direction, correlation_id) |
 
-Hard invariants (DB-enforced):
-- One `ACTIVE` hall_pass per student at a time.
-- One `attendance_record` per (`class_session_id`, `student_id`).
+`guardians` / `student_guardians` — **not built**; parent-comms owns guardian state. HPAO references guardians only as opaque IDs in payloads.
 
 Enums:
 - `attendance.status`: `PRESENT | ABSENT | TARDY | EXCUSED | UNEXCUSED`
+- `attendance.source`: `TEACHER | AGENT | IMPORT`
 - `hall_pass.status`: `ACTIVE | RETURNED | OVERDUE | FLAGGED`
 - `hall_pass.destination`: `RESTROOM | NURSE | COUNSELOR | OFFICE | OTHER`
 - `alert.severity`: `low | medium | high | critical`
+- `alert.status`: `OPEN | ACKNOWLEDGED | RESOLVED`
+- `agent_message.direction`: `INBOUND | OUTBOUND`
+- `agent_message.status`: `PENDING | SENT | FAILED | RECEIVED`
 
 ## Policy engine (hybrid)
 
@@ -100,7 +184,7 @@ Enums:
    - `tea.compulsory_attendance.90_percent` — TEC §25.092, attend ≥ 90% of days offered.
    - `tea.truancy.unexcused_absences` — 3 unexcused in 4-week window or 10 in 6 months.
    - `pfisd.18_day_max` — alert at 15 absences (configurable threshold).
-   - `restroom.duration_exceeded` — `hall_pass` open past `expected_return_at`.
+   - `hallpass.<destination>.duration_exceeded` — `hall_pass` open past `expected_return_at`. RESTROOM = severity `high`, others = `medium`.
 2. **RAG** over policy docs for nuance (e.g. exemption eligibility under TEC §25.087). **Advisory only** — cannot override deterministic outcomes.
 
 ## Stack
@@ -113,11 +197,11 @@ Enums:
 
 ## Conventions
 
-- IDs: UUIDv4 (UUIDv7 deferred -- not in stdlib for our `>=3.12` floor).
+- IDs: UUIDv4 (UUIDv7 deferred — not in stdlib for our `>=3.12` floor).
 - Times: UTC ISO-8601 in payloads; school-local time stored on session records.
-- All POSTs accept `Idempotency-Key` header.
+- All POSTs accept `Idempotency-Key` header; boundary endpoints additionally key off `correlation_id`.
 - Errors: RFC 7807 `application/problem+json`.
-- Auth between services: HMAC-SHA256 over raw body.
+- Auth between services: HMAC-SHA256 over raw body (`X-HPAO-Signature`).
 
 ## Out of scope (hackathon)
 
@@ -125,7 +209,13 @@ SSO, SIS sync, multi-tenant, mobile UIs, push notifications, parent-facing UX (t
 
 ## Pointers
 
-- OpenAPI: `/openapi.json` (once running).
-- Migrations: `alembic/versions/`.
-- Rule definitions: `src/hpao/policy/rules/`.
-- Boundary schemas: `src/hpao/schemas/agent.py`.
+- **Plan + status**: `PLAN.md` (living doc, also tracks per-phase completion).
+- **Migrations**: `alembic/versions/` (0001–0008 currently).
+- **Domain models**: `src/hpao/models/`.
+- **Services** (DB I/O, business logic): `src/hpao/services/` — `attendance.py`, `hall_pass.py`, `alerts.py`, `agent_messages.py`, `dispatcher.py`.
+- **API routers**: `src/hpao/api/agent.py` (boundary), `src/hpao/realtime/` (WebSocket).
+- **Outbound HTTP client**: `src/hpao/integrations/parent_comms.py`.
+- **Boundary schemas (Pydantic)**: `src/hpao/schemas/agent.py`.
+- **HMAC sign/verify**: `src/hpao/api/security.py`.
+- **CLI demo runner**: `python -m hpao.cli.dispatcher`.
+- **OpenAPI**: `/openapi.json` once an app mounting the routers is running.
