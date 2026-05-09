@@ -76,6 +76,7 @@ strict = true
 mypy_path = "src"
 explicit_package_bases = true
 files = ["src/hpao"]
+plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = "hpao.agent.*"
