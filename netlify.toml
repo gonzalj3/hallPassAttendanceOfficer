@@ -1,0 +1,21 @@
+# Netlify build config for the React/Vite frontend in /frontend.
+# The backend (FastAPI) is NOT deployed here — host it separately
+# (Fly.io / Render / Railway) and point VITE_API_URL at it from the
+# Netlify dashboard once Phase 8's REST API ships.
+
+[build]
+  base = "frontend"
+  publish = "dist"
+  command = "npm ci && npm run build"
+
+[build.environment]
+  # Vite 5 needs Node 18+. Pinned to 20 LTS for predictable builds.
+  NODE_VERSION = "20"
+
+# Single-page app fallback: any path that isn't a real file in /dist
+# falls through to index.html so react-router-dom handles the route
+# on the client. Without this, hitting /classes directly would 404.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
