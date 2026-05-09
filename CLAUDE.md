@@ -113,7 +113,7 @@ Enums:
 
 ## Conventions
 
-- IDs: UUIDv7 (sortable).
+- IDs: UUIDv4 (UUIDv7 deferred -- not in stdlib for our `>=3.12` floor).
 - Times: UTC ISO-8601 in payloads; school-local time stored on session records.
 - All POSTs accept `Idempotency-Key` header.
 - Errors: RFC 7807 `application/problem+json`.
