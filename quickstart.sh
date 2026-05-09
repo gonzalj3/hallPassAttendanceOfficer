@@ -117,7 +117,9 @@ fi
 
 BACKEND_AVAILABLE=0
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  docker compose -f "$ROOT_DIR/docker-compose.yml" up -d db
+  # cd into ROOT_DIR so docker compose auto-loads docker-compose.override.yml
+  # if the dev has one (gitignored, used to dodge host-port collisions).
+  (cd "$ROOT_DIR" && docker compose up -d db)
   (cd "$ROOT_DIR" && "$VENV_DIR/bin/alembic" -c "$ROOT_DIR/alembic.ini" upgrade head)
   printf 'Seeding demo school + classes + students (idempotent)...\n'
   (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m hpao.cli.seed)
