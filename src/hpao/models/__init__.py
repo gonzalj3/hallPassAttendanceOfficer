@@ -1,3 +1,4 @@
+from hpao.models.alert import ALERT_SEVERITIES, ALERT_STATUSES, Alert
 from hpao.models.attendance_record import (
     ATTENDANCE_SOURCES,
     ATTENDANCE_STATUSES,
@@ -24,6 +25,8 @@ from hpao.models.student import GRADE_LEVELS, Student
 from hpao.models.user import USER_ROLES, User
 
 __all__ = [
+    "ALERT_SEVERITIES",
+    "ALERT_STATUSES",
     "ATTENDANCE_SOURCES",
     "ATTENDANCE_STATUSES",
     "EMBEDDING_DIM",
@@ -33,6 +36,7 @@ __all__ = [
     "POLICY_RULE_SEVERITIES",
     "POLICY_SCOPES",
     "USER_ROLES",
+    "Alert",
     "AttendanceRecord",
     "Class",
     "ClassEnrollment",

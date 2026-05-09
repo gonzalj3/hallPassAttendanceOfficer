@@ -11,8 +11,11 @@ Living doc. Update after each phase ships.
   - ✅ 1c: Users + Classes + Enrollments + Class Sessions
 - ✅ **Phase 2** — Attendance core (complete)
 - ✅ **Phase 3** — Hall passes (complete)
-- ⏭ **Phase 4** — Real-time layer (owned by other agent; 4a + 4b + 4c shipped)
-- ⏭ **Phase 5** — Policy ingestion + rule engine (next for me)
+- ✅ **Phase 4** — Real-time layer (other agent; 4a + 4b + 4c shipped)
+- ✅ **Phase 5a** — Policies + chunks + rules schema (other agent; rule evaluator still to come)
+- ✅ **Phase 6** — Alerts + 15-min restroom rule (complete)
+- ⏭ **Phase 5b** — Policy ingestion + rule evaluator (other agent's likely next)
+- ⏭ **Phase 8** — Inter-agent boundary endpoints (next demo-critical step)
 
 ## All phases
 
@@ -20,11 +23,11 @@ Living doc. Update after each phase ships.
 |---|---|---|---|
 | 0 | TDD harness + bootstrap | ✅ done | pyproject, ruff/mypy, pre-commit gate, CI, docker-compose, CLAUDE.md |
 | 1 | Domain models | ✅ done | Schools, Students, Users, Classes, Enrollments, Class Sessions |
-| 2 | Attendance core | 🔄 in progress | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
+| 2 | Attendance core | ✅ done | `attendance_records` + service for record/edit/list, source tracking, idempotency on (session, student) |
 | 3 | Hall passes | ✅ done | `hall_passes` + check-out/in service, active-pass invariant, overdue detection |
 | 4 | Real-time layer | ✅ done (other agent) | Postgres `LISTEN/NOTIFY` → WebSocket fan-out with `school:` / `class:` / `student:` channel scoping |
-| 5 | Policy ingestion + rule engine | ⏭ | `policies`, `policy_chunks` (pgvector), `policy_rules`, evaluator, seed rules from TEC + PfISD |
-| 6 | Alerts + threshold detection | ⏭ | `alerts`, triggers (write + overdue + nightly), 15-min restroom rule wired to on-duty admin |
+| 5 | Policy ingestion + rule engine | 🔄 5a done (other agent) | `policies`, `policy_chunks` (pgvector), `policy_rules` schema landed; ingestion CLI + evaluator service still to come |
+| 6 | Alerts + threshold detection | ✅ done | `alerts`, raise/ack/resolve, partial unique on OPEN per (student, rule), 15-min restroom detect_overdue_passes wired |
 | 7 | Agent layer | ⏭ | OpenAI Codex agent loop + tool surface (attendance, hallpass, rules, policy, alert, relay) |
 | 8 | Inter-agent boundary | ⏭ | REST endpoints + HMAC-signed outbound webhook to parent-comms agent |
 | 9 | Audit + observability | ⏭ | `audit_log`, structured logging, LLM token budget + circuit breaker |

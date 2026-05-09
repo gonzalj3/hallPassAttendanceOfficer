@@ -4,6 +4,7 @@ from uuid import uuid4
 import factory
 
 from hpao.models import (
+    Alert,
     AttendanceRecord,
     Class,
     ClassEnrollment,
@@ -147,3 +148,18 @@ class PolicyRuleFactory(factory.Factory):  # type: ignore[misc]
     expression = factory.LazyFunction(lambda: {"op": "noop"})
     threshold = None
     severity = "medium"
+
+
+class AlertFactory(factory.Factory):  # type: ignore[misc]
+    class Meta:
+        model = Alert
+
+    id = factory.LazyFunction(uuid4)
+    student_id = factory.LazyFunction(uuid4)  # override
+    rule_key = "hallpass.restroom.duration_exceeded"
+    severity = "high"
+    status = "OPEN"
+    context = factory.LazyFunction(dict)
+    acknowledged_by = None
+    acknowledged_at = None
+    resolved_at = None
