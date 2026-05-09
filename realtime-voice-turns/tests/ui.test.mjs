@@ -18,6 +18,8 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(html, /Start Absentee Call/);
   assert.match(html, /id="hallPassButton"/);
   assert.match(html, /Start Hall Pass Call/);
+  assert.match(html, /id="caseStrip" hidden/);
+  assert.doesNotMatch(html, /Loading attendance case/);
   assert.match(html, /Enable Mic/);
   assert.doesNotMatch(html, /id="stopButton"/);
   assert.match(html, /role="tablist"/);
@@ -66,6 +68,8 @@ test("UI includes a reset call control wired to restart the session", async () =
   assert.match(app, /toggleMicrophoneListening/);
   assert.match(app, /micToggleButton\.addEventListener/);
   assert.match(app, /setCallButtonStarted/);
+  assert.match(app, /isCaseSummaryVisible/);
+  assert.match(app, /hideCaseSummary/);
   assert.match(app, /End Call/);
   assert.match(app, /callScenarios/);
   assert.match(app, /caseSummary/);

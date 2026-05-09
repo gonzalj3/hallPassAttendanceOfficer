@@ -28,6 +28,7 @@ let isListenOnlySession = false;
 let shouldKeepListenOnlyStatus = false;
 let isMicrophoneListening = false;
 let activeScenario = "absentee";
+let isCaseSummaryVisible = false;
 
 function apiPath(path) {
   if (window.location.protocol === "file:") {
@@ -393,14 +394,22 @@ async function loadCase() {
 }
 
 function renderCaseSummary(scenario = activeScenario) {
-  if (!activeCase) return;
+  if (!activeCase || !isCaseSummaryVisible) return;
 
   const scenarioConfig = callScenarios[scenario] ?? callScenarios.absentee;
   caseStrip.textContent = scenarioConfig.caseSummary(activeCase);
+  caseStrip.hidden = false;
+}
+
+function hideCaseSummary() {
+  isCaseSummaryVisible = false;
+  caseStrip.textContent = "";
+  caseStrip.hidden = true;
 }
 
 async function startSession(scenario = "absentee") {
   activeScenario = scenario;
+  isCaseSummaryVisible = true;
   renderCaseSummary(scenario);
   startButton.disabled = true;
   hallPassButton.disabled = true;
@@ -507,6 +516,7 @@ function stopSession() {
   resetButton.disabled = true;
   setMode("idle");
   setStatus("Idle", "Click Start, allow the mic, then respond as the parent.");
+  hideCaseSummary();
 }
 
 async function restartSession() {
@@ -518,7 +528,9 @@ async function restartSession() {
 
 loadCase().catch((error) => {
   setMode("error");
+  isCaseSummaryVisible = true;
   caseStrip.textContent = "Could not load attendance case.";
+  caseStrip.hidden = false;
   appendLog("error", "Could not load attendance case.");
 });
 
