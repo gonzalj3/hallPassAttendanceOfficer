@@ -8,7 +8,7 @@ straight from `mockData.ts` onto a real `fetch()` without renaming props.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -83,3 +83,55 @@ class IssueHallPassIn(_CamelBase):
         description="Override default duration. Demo path uses 1 to fast-trip the alert.",
         ge=1,
     )
+
+
+# ---------- voice-call dashboard reads ----------
+
+
+VoiceCallScenarioLiteral = Literal["absentee", "hall_pass", "other"]
+AlertStatusLiteral = Literal["OPEN", "ACKNOWLEDGED", "RESOLVED"]
+SeverityLiteral = Literal["low", "medium", "high", "critical"]
+
+
+class TranscriptTurnOut(_CamelBase):
+    speaker: str
+    text: str
+    occurred_at: datetime | None = Field(default=None, serialization_alias="occurredAt")
+
+
+class VoiceCallSummaryOut(_CamelBase):
+    """Card-shaped row for the admin dashboard's voice-call list.
+
+    Excludes the full transcript; clients fetch /api/voice-calls/{id} on
+    expand to see every turn.
+    """
+
+    id: UUID = Field(description="agent_messages row id")
+    correlation_id: UUID = Field(serialization_alias="correlationId")
+    student_id: UUID = Field(serialization_alias="studentId")
+    student_name: str = Field(serialization_alias="studentName")
+    alert_id: UUID | None = Field(default=None, serialization_alias="alertId")
+    scenario: VoiceCallScenarioLiteral
+    call_started_at: datetime = Field(serialization_alias="callStartedAt")
+    call_ended_at: datetime = Field(serialization_alias="callEndedAt")
+    excuse_summary: str | None = Field(default=None, serialization_alias="excuseSummary")
+    parent_confirmed: bool | None = Field(default=None, serialization_alias="parentConfirmed")
+    language: str | None = None
+    created_at: datetime = Field(serialization_alias="createdAt")
+
+
+class VoiceCallDetailOut(VoiceCallSummaryOut):
+    """Full voice-call record including the per-turn transcript."""
+
+    transcript: list[TranscriptTurnOut]
+
+
+class AlertSummaryOut(_CamelBase):
+    id: UUID
+    student_id: UUID = Field(serialization_alias="studentId")
+    student_name: str = Field(serialization_alias="studentName")
+    rule_key: str = Field(serialization_alias="ruleKey")
+    severity: SeverityLiteral
+    status: AlertStatusLiteral
+    context: dict[str, Any]
+    created_at: datetime = Field(serialization_alias="createdAt")

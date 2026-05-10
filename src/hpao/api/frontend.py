@@ -11,6 +11,9 @@ Routes (all prefixed `/api`):
   POST /hall-passes                    — issue
   POST /hall-passes/{id}/return        — check in
   GET  /hall-passes                    — list, optional status / sessionId filter
+  GET  /voice-calls                    — recent voice-agent conversations
+  GET  /voice-calls/{id}               — full transcript
+  GET  /alerts                         — open / acknowledged / resolved alerts
 """
 
 from __future__ import annotations
@@ -25,6 +28,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hpao.models import (
+    AgentMessage,
+    Alert,
     Class,
     ClassEnrollment,
     ClassSession,
@@ -32,12 +37,17 @@ from hpao.models import (
     Student,
 )
 from hpao.schemas.frontend import (
+    AlertStatusLiteral,
+    AlertSummaryOut,
     ClassPeriodOut,
     HallPassOut,
     HallPassStatusLiteral,
     IssueHallPassIn,
     RosterOut,
     StudentOut,
+    TranscriptTurnOut,
+    VoiceCallDetailOut,
+    VoiceCallSummaryOut,
 )
 from hpao.services.hall_pass import (
     HallPassConflictError,
@@ -290,6 +300,161 @@ async def list_hall_passes(
     stmt = stmt.order_by(HallPass.checked_out_at.desc())
     rows = list((await db.execute(stmt)).scalars().all())
     return [await _hall_pass_to_out(db, hp) for hp in rows]
+
+
+# ---------- voice-call dashboard reads ----------
+
+
+VOICE_AGENT_COUNTERPARTY = "voice_agent"
+
+
+def _voice_call_summary(msg: AgentMessage, student: Student) -> dict[str, Any]:
+    p = dict(msg.payload)
+    return {
+        "id": msg.id,
+        "correlation_id": msg.correlation_id,
+        "student_id": msg.student_id,
+        "student_name": f"{student.first_name} {student.last_name}",
+        "alert_id": msg.alert_id,
+        "scenario": p.get("scenario", "other"),
+        "call_started_at": p["call_started_at"],
+        "call_ended_at": p["call_ended_at"],
+        "excuse_summary": p.get("excuse_summary"),
+        "parent_confirmed": p.get("parent_confirmed"),
+        "language": p.get("language"),
+        "created_at": msg.created_at,
+    }
+
+
+@router.get(
+    "/voice-calls",
+    response_model=list[VoiceCallSummaryOut],
+    response_model_by_alias=True,
+)
+async def list_voice_calls(
+    db: SessionDep,
+    limit: int = 20,
+    student_id: UUID | None = None,
+) -> list[VoiceCallSummaryOut]:
+    """Most-recent finished voice-agent conversations (no transcript body).
+
+    Default limit 20 keeps the admin dashboard's first paint cheap; clients
+    can ask for more or scope by student to power the per-student timeline.
+    """
+    stmt = (
+        select(AgentMessage)
+        .where(
+            AgentMessage.counterparty == VOICE_AGENT_COUNTERPARTY,
+            AgentMessage.direction == "INBOUND",
+        )
+        .order_by(AgentMessage.created_at.desc())
+        .limit(min(limit, 200))
+    )
+    if student_id is not None:
+        stmt = stmt.where(AgentMessage.student_id == student_id)
+    msgs = list((await db.execute(stmt)).scalars().all())
+    if not msgs:
+        return []
+
+    student_ids = {m.student_id for m in msgs if m.student_id is not None}
+    students = (
+        (await db.execute(select(Student).where(Student.id.in_(student_ids)))).scalars().all()
+    )
+    by_id = {s.id: s for s in students}
+
+    out: list[VoiceCallSummaryOut] = []
+    for m in msgs:
+        student = by_id.get(m.student_id) if m.student_id is not None else None
+        if student is None:  # voice-agent calls always have a student FK
+            continue
+        out.append(VoiceCallSummaryOut.model_validate(_voice_call_summary(m, student)))
+    return out
+
+
+@router.get(
+    "/voice-calls/{message_id}",
+    response_model=VoiceCallDetailOut,
+    response_model_by_alias=True,
+)
+async def get_voice_call(message_id: UUID, db: SessionDep) -> VoiceCallDetailOut:
+    msg = await db.get(AgentMessage, message_id)
+    if msg is None or msg.counterparty != VOICE_AGENT_COUNTERPARTY:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"voice call {message_id} not found",
+        )
+    if msg.student_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"voice call {message_id} has no student_id",
+        )
+    student = await db.get(Student, msg.student_id)
+    if student is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"student {msg.student_id} not found",
+        )
+    summary = _voice_call_summary(msg, student)
+    summary["transcript"] = [
+        TranscriptTurnOut.model_validate(t) for t in (msg.payload.get("transcript", []) or [])
+    ]
+    return VoiceCallDetailOut.model_validate(summary)
+
+
+# ---------- alerts ----------
+
+
+@router.get(
+    "/alerts",
+    response_model=list[AlertSummaryOut],
+    response_model_by_alias=True,
+)
+async def list_alerts(
+    db: SessionDep,
+    status_filter: AlertStatusLiteral | None = None,
+    student_id: UUID | None = None,
+    limit: int = 50,
+) -> list[AlertSummaryOut]:
+    """Alerts for the dashboard's Live Activity tab.
+
+    Default behavior returns every status, ordered most-recent first. Use
+    `status_filter=OPEN` to restrict to actionable items.
+    """
+    stmt = select(Alert)
+    if status_filter is not None:
+        stmt = stmt.where(Alert.status == status_filter)
+    if student_id is not None:
+        stmt = stmt.where(Alert.student_id == student_id)
+    stmt = stmt.order_by(Alert.created_at.desc()).limit(min(limit, 200))
+    alerts = list((await db.execute(stmt)).scalars().all())
+    if not alerts:
+        return []
+
+    student_ids = {a.student_id for a in alerts}
+    students = (
+        (await db.execute(select(Student).where(Student.id.in_(student_ids)))).scalars().all()
+    )
+    by_id = {s.id: s for s in students}
+
+    out: list[AlertSummaryOut] = []
+    for a in alerts:
+        student = by_id.get(a.student_id)
+        name = f"{student.first_name} {student.last_name}" if student else "(unknown)"
+        out.append(
+            AlertSummaryOut.model_validate(
+                {
+                    "id": a.id,
+                    "student_id": a.student_id,
+                    "student_name": name,
+                    "rule_key": a.rule_key,
+                    "severity": a.severity,
+                    "status": a.status,
+                    "context": dict(a.context or {}),
+                    "created_at": a.created_at,
+                }
+            )
+        )
+    return out
 
 
 # ---------- mount helper ----------
