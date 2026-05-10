@@ -2,6 +2,10 @@
 
 Ava Attendance Officer is a hackathon prototype for a high-school attendance workflow that connects classroom attendance, student hall-pass behavior, core policy logic, and guardian outreach into one loop.
 
+Deployed Links:
+
+[Classroom Tablet App](https://verdant-pie-1d3c9f.netlify.app/) and [Admin Dashboard](https://dashboardfrontendadmin.netlify.app/)
+
 The system has four equal parts:
 
 ```mermaid
@@ -60,13 +64,12 @@ flowchart LR
   C --> D["Ava records transcript, excuse, language, and follow-up status"]
 ```
 
-
 ## Prerequisites
 
 Pinned versions live in `pyproject.toml` (`requires-python = ">=3.12"`), `.python-version`, `.tool-versions`, `frontend/package.json` (`engines`), and `outbound-voice-agent/package.json` (`engines`). The full matrix:
 
 | Tool | Required version | Why | Quick install |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Python** | 3.12 or newer (3.13 also tested) | Backend runtime + alembic + pytest | macOS: `brew install python@3.12` · Linux: `apt install python3.12 python3.12-venv` · Windows: [python.org installer](https://www.python.org/downloads/) · pyenv: `pyenv install 3.12 && pyenv local 3.12` (reads `.python-version`) · asdf: `asdf install` (reads `.tool-versions`) |
 | **pip** | 24+ | Resolves `pyproject.toml` extras | Bundled with Python; `python3 -m pip install --upgrade pip` |
 | **Node.js** | 20.x or newer | Frontend (Vite) + Outbound Voice Agent | macOS: `brew install node@20` · nvm: `nvm install 20 && nvm use 20` · asdf: `asdf install` |
@@ -124,7 +127,7 @@ chmod +x quickstart.sh
 The script installs the backend/core Python package, starts local Postgres when Docker is available, runs alembic migrations, seeds a demo school + classes + students, brings up the Ava backend (FastAPI) on `:8000`, installs the Teacher Dashboard / Hall Pass iPad frontend, installs the Outbound Voice Agent, starts both local web servers wired against the backend (`VITE_API_URL=http://localhost:8000`), and opens:
 
 - Teacher Dashboard: `http://localhost:3100/`
-- Hall Pass iPad:    `http://localhost:3000/` (same app — pick a class, then a student)
+- Hall Pass iPad: `http://localhost:3000/` (same app — pick a class, then a student)
 - Swagger API Docs: `http://localhost:8000/docs`
 - Outbound Voice Agent: `http://localhost:5178`
 
@@ -201,7 +204,7 @@ The browser sends a scenario-specific opening instruction for the combined atten
 Outbound voice demo endpoints:
 
 | Endpoint | Purpose |
-|---|---|
+| --- | --- |
 | `GET /case` | Load the current synthetic student case |
 | `POST /session` | Exchange browser SDP for an OpenAI Realtime WebRTC answer |
 | `POST /conversation-log` | Append transcript rows to the demo datastore |
