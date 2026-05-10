@@ -120,6 +120,22 @@ PIDS=()
 trap cleanup EXIT INT TERM
 
 printf 'Preparing ABE core/data logic...\n'
+
+# Preflight: make sure the python3 we're about to build the venv with is
+# new enough that `pip install -e ".[dev]"` won't immediately reject it
+# for `requires-python = ">=3.12"`. Without this check the venv would
+# install fine, then pip would fail deeper in with a less obvious error.
+if ! command -v python3 >/dev/null 2>&1; then
+  printf 'ERROR: python3 not found on PATH. See README -> Prerequisites.\n' >&2
+  exit 1
+fi
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)'; then
+  PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}")')
+  printf 'ERROR: Python 3.12+ required, found %s. See README -> Prerequisites.\n' "$PY_VER" >&2
+  printf '       (pyenv users: `pyenv install 3.12 && pyenv local 3.12`. asdf users: `asdf install`.)\n' >&2
+  exit 1
+fi
+
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   python3 -m venv "$VENV_DIR"
 fi

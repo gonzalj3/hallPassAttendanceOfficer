@@ -90,7 +90,20 @@ docker --version     # any 20.10+ release
 docker compose version
 ```
 
-If any of those fail, fix that tool before running `quickstart.sh` — it doesn't probe versions and will surface the failure deeper in the install where the message is harder to read.
+If any of those fail, fix that tool before running `quickstart.sh`. The script does an explicit Python ≥ 3.12 preflight and exits with a clear message if the wrong version is found; other tools surface their failures further along, so it's worth running these five commands first.
+
+### Recommended: auto-activate the venv with `direnv`
+
+`quickstart.sh` and `make install` create a `.venv/` at the repo root. To make `python`, `pytest`, `alembic`, etc. resolve to the venv automatically whenever you `cd` into the repo (no `source .venv/bin/activate` ritual, no `.venv/bin/` prefixing):
+
+```bash
+brew install direnv                                # or: apt install direnv
+echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc      # or .bashrc
+cd hallPassAttendanceOfficer
+direnv allow .                                     # one-time, accepts the checked-in .envrc
+```
+
+The `.envrc` we ship is a single conditional `source .venv/bin/activate`, so it's a no-op until `quickstart.sh` creates the venv, then it activates on the next prompt. Optional but strongly recommended.
 
 ## Quick Start
 
