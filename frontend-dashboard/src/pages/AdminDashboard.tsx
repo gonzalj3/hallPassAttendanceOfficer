@@ -14,6 +14,7 @@ import {
   type OutOfClassEntry,
 } from '../data/mockAdmin';
 import { useDashboardData } from '../hooks/useDashboardData';
+import { useFaviconBadge } from '../hooks/useFaviconBadge';
 import type {
   AlertSummaryApi,
   TranscriptTurnApi,
@@ -28,9 +29,7 @@ type SectionKey =
   | 'live_rosters'
   | 'live_activity'
   | 'attendance'
-  | 'alerts'
-  | 'reports'
-  | 'settings';
+  | 'alerts';
 
 const formatElapsed = (s: number) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -64,10 +63,14 @@ const kpisFor = (range: DateRange, flaggedNow: number): Kpis => {
   const m = RANGE_MULTIPLIER[range];
   return {
     outNow: mockKpis.outNow,
-    totalLabel: range === 'today' ? 'Today Total' : range === 'week' ? 'Week Total' : 'Month Total',
+    totalLabel:
+      range === 'today'
+        ? 'Today Total'
+        : range === 'week'
+          ? 'Week Total'
+          : 'Month Total',
     total: mockKpis.todayTotal * m,
-    activeFlags:
-      range === 'today' ? flaggedNow : range === 'week' ? 11 : 38,
+    activeFlags: range === 'today' ? flaggedNow : range === 'week' ? 11 : 38,
     avgDurationSeconds: RANGE_AVG_DURATION[range],
     lockdowns: range === 'month' ? 1 : 0,
     absent: range === 'today' ? mockKpis.absent : range === 'week' ? 45 : 120,
@@ -76,12 +79,12 @@ const kpisFor = (range: DateRange, flaggedNow: number): Kpis => {
 
 const classroomVolumeFor = (range: DateRange): ClassroomVolume[] => {
   const m = RANGE_MULTIPLIER[range];
-  return mockClassroomVolume.map((c) => ({ ...c, passCount: c.passCount * m }));
+  return mockClassroomVolume.map(c => ({ ...c, passCount: c.passCount * m }));
 };
 
 const topStudentsFor = (range: DateRange): TopStudent[] => {
   const m = RANGE_MULTIPLIER[range];
-  return mockTopStudents.map((s) => ({ ...s, passCount: s.passCount * m }));
+  return mockTopStudents.map(s => ({ ...s, passCount: s.passCount * m }));
 };
 
 const OUT_LOCATIONS: OutLocation[] = ['Restroom', 'Nurse', 'Office', 'Hallway'];
@@ -92,8 +95,6 @@ const SECTION_TITLES: Record<SectionKey, string> = {
   live_activity: 'Live Activity — All Active Passes',
   attendance: 'Attendance',
   alerts: 'Alerts',
-  reports: 'Reports',
-  settings: 'Settings',
 };
 
 export default function AdminDashboard() {
@@ -112,9 +113,15 @@ export default function AdminDashboard() {
 
   const flaggedNow = useMemo(
     () =>
-      data.activePasses.filter((p) => elapsedSec(p.startedAt, now) > p.thresholdSeconds)
-        .length,
+      data.activePasses.filter(
+        p => elapsedSec(p.startedAt, now) > p.thresholdSeconds,
+      ).length,
     [now, data.activePasses],
+  );
+  /** Set to a number to preview the tab favicon badge; set back to `null` for live overdue count. */
+  const FAVICON_BADGE_PREVIEW: number | null = 3;
+  useFaviconBadge(
+    FAVICON_BADGE_PREVIEW !== null ? FAVICON_BADGE_PREVIEW : flaggedNow,
   );
 
   const kpis = useMemo(() => {
@@ -144,7 +151,8 @@ export default function AdminDashboard() {
         />
         {data.error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {data.error}. Showing placeholder volume / leaderboard until backend reconnects.
+            {data.error}. Showing placeholder volume / leaderboard until backend
+            reconnects.
           </div>
         )}
         {section === 'overview' && (
@@ -177,12 +185,12 @@ export default function AdminDashboard() {
             onBack={() => setSection('overview')}
           />
         )}
-        {section === 'attendance' && <AttendancePage classRosters={data.classRosters} />}
+        {section === 'attendance' && (
+          <AttendancePage classRosters={data.classRosters} />
+        )}
         {section === 'alerts' && (
           <AlertsPage alerts={data.alerts} voiceCalls={data.voiceCalls} />
         )}
-        {(section === 'reports' ||
-          section === 'settings') && <ComingSoon section={section} />}
       </main>
     </div>
   );
@@ -220,20 +228,22 @@ function Sidebar({
       badge: flaggedNow,
       badgeColor: 'bg-[#ba1a1a]',
     },
-    { key: 'reports', icon: '📈', label: 'Reports' },
-    { key: 'settings', icon: '⚙️', label: 'Settings' },
   ];
 
   return (
     <aside className="w-60 bg-[#171d1e] text-white min-h-screen p-5">
       <div className="flex items-center gap-2 mb-8">
-        <div className="w-8 h-8 rounded-lg bg-[#00818a] flex items-center justify-center font-bold font-['Lexend',sans-serif]">
-          H
+        <img
+          src="/favicon.png"
+          alt="HallPass Pro"
+          className="w-8 h-8 rounded-lg"
+        />
+        <div className="font-['Lexend',sans-serif] font-semibold">
+          HallPass Pro
         </div>
-        <div className="font-['Lexend',sans-serif] font-semibold">HallPass Pro</div>
       </div>
       <nav className="space-y-1 text-sm">
-        {items.map((item) => {
+        {items.map(item => {
           const active = item.key === section;
           return (
             <button
@@ -260,7 +270,9 @@ function Sidebar({
         })}
       </nav>
       <div className="mt-8 pt-5 border-t border-white/10">
-        <div className="text-xs text-[#6d797b] uppercase font-semibold mb-2">System</div>
+        <div className="text-xs text-[#6d797b] uppercase font-semibold mb-2">
+          System
+        </div>
         <div className="text-sm flex items-center gap-2 mb-1.5">
           <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
           API live
@@ -300,7 +312,7 @@ function TopBar({
       </div>
       {showRangeFilter && (
         <div className="flex gap-2 text-sm">
-          {ranges.map((r) => (
+          {ranges.map(r => (
             <button
               key={r}
               type="button"
@@ -342,7 +354,7 @@ function KpiStrip({ kpis }: { kpis: Kpis }) {
 
   return (
     <div className="grid grid-cols-5 gap-3 mb-5">
-      {tiles.map((t) => (
+      {tiles.map(t => (
         <div key={t.label} className="bg-white rounded-xl p-4 shadow-sm">
           <div className="text-[10px] uppercase tracking-wide text-[#6d797b] font-semibold">
             {t.label}
@@ -376,8 +388,7 @@ function LiveActivityCard({
   const sorted = useMemo(
     () =>
       [...passes].sort(
-        (a, b) =>
-          elapsedSec(b.startedAt, now) - elapsedSec(a.startedAt, now),
+        (a, b) => elapsedSec(b.startedAt, now) - elapsedSec(a.startedAt, now),
       ),
     [passes, now],
   );
@@ -387,14 +398,16 @@ function LiveActivityCard({
   return (
     <div className="col-span-7 bg-white rounded-xl p-5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">Live activity</h3>
+        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
+          Live activity
+        </h3>
         <span className="text-xs text-[#00666e] flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00818a] animate-pulse" />
           Streaming · {passes.length} out
         </span>
       </div>
       <div className="space-y-2.5 text-sm">
-        {preview.map((pass) => {
+        {preview.map(pass => {
           const elapsed = elapsedSec(pass.startedAt, now);
           const flagged = elapsed > pass.thresholdSeconds;
           return (
@@ -409,8 +422,8 @@ function LiveActivityCard({
               }
             >
               <div>
-                <span className="font-semibold">{pass.studentName}</span> · {pass.destination} ·{' '}
-                {pass.classroom}
+                <span className="font-semibold">{pass.studentName}</span> ·{' '}
+                {pass.destination} · {pass.classroom}
               </div>
               <div
                 className={
@@ -431,7 +444,9 @@ function LiveActivityCard({
         onClick={onViewAll}
         className="mt-4 w-full text-center text-sm font-medium text-[#00666e] hover:text-[#00818a] py-2 rounded-lg hover:bg-[#eff5f5] transition-colors"
       >
-        {hidden > 0 ? `View all ${passes.length} active passes →` : 'View full activity log →'}
+        {hidden > 0
+          ? `View all ${passes.length} active passes →`
+          : 'View full activity log →'}
       </button>
     </div>
   );
@@ -444,7 +459,7 @@ function ClassroomVolumeCard({
   volume: ClassroomVolume[];
   range: DateRange;
 }) {
-  const max = Math.max(...volume.map((c) => c.passCount));
+  const max = Math.max(...volume.map(c => c.passCount));
   const colorAt = (i: number) =>
     i <= 1 ? 'bg-[#00666e]' : i <= 3 ? 'bg-[#00818a]' : 'bg-[#63d7e2]';
 
@@ -497,8 +512,8 @@ function HourlyChartCard({ range }: { range: DateRange }) {
   const padX = 30;
 
   const m = RANGE_MULTIPLIER[range];
-  const today = useMemo(() => mockHourlyToday.map((v) => v * m), [m]);
-  const avg = useMemo(() => mockHourlyAvg.map((v) => v * m), [m]);
+  const today = useMemo(() => mockHourlyToday.map(v => v * m), [m]);
+  const avg = useMemo(() => mockHourlyAvg.map(v => v * m), [m]);
 
   const max = Math.max(...today, ...avg);
   const xStep = (W - padX * 2) / (today.length - 1);
@@ -520,7 +535,9 @@ function HourlyChartCard({ range }: { range: DateRange }) {
   return (
     <div className="col-span-8 bg-white rounded-xl p-5 shadow-sm">
       <div className="flex items-end justify-between mb-3">
-        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">Movement by hour</h3>
+        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
+          Movement by hour
+        </h3>
         <span className="text-xs text-[#6d797b]">{subtitle}</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-48">
@@ -546,7 +563,13 @@ function HourlyChartCard({ range }: { range: DateRange }) {
             );
           })}
         </g>
-        <path d={linePath} fill="none" stroke="#ba1a1a" strokeWidth="2" strokeDasharray="4,4" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#ba1a1a"
+          strokeWidth="2"
+          strokeDasharray="4,4"
+        />
         <g fontSize="10" fill="#6d797b">
           {hourLabels.map((label, i) => (
             <text key={label} x={x(i) - 8} y={172}>
@@ -574,10 +597,12 @@ function FrequentFlyersCard({
 
   return (
     <div className="col-span-4 bg-white rounded-xl p-5 shadow-sm">
-      <h3 className="font-['Lexend',sans-serif] font-semibold text-base mb-4">{TITLE[range]}</h3>
+      <h3 className="font-['Lexend',sans-serif] font-semibold text-base mb-4">
+        {TITLE[range]}
+      </h3>
       <table className="w-full text-sm">
         <tbody className="divide-y divide-[#eff5f5]">
-          {students.map((s) => (
+          {students.map(s => (
             <tr key={s.id}>
               <td className="py-2 font-semibold">{s.name}</td>
               <td className="py-2 text-right font-['Lexend',sans-serif] font-bold">
@@ -605,16 +630,17 @@ function LiveActivityFullPage({
   const filterChips: Array<{ key: typeof filter; label: string }> = [
     { key: 'all', label: `All (${passes.length})` },
     { key: 'flagged', label: 'Flagged ⚠' },
-    ...OUT_LOCATIONS.map((l) => ({
+    ...OUT_LOCATIONS.map(l => ({
       key: l as OutLocation,
-      label: `${l} (${passes.filter((p) => p.destination === l).length})`,
+      label: `${l} (${passes.filter(p => p.destination === l).length})`,
     })),
   ];
 
   const filtered = useMemo(() => {
-    const byFilter = passes.filter((p) => {
+    const byFilter = passes.filter(p => {
       if (filter === 'all') return true;
-      if (filter === 'flagged') return elapsedSec(p.startedAt, now) > p.thresholdSeconds;
+      if (filter === 'flagged')
+        return elapsedSec(p.startedAt, now) > p.thresholdSeconds;
       return p.destination === filter;
     });
     return [...byFilter].sort(
@@ -644,7 +670,7 @@ function LiveActivityFullPage({
       </div>
 
       <div className="flex flex-wrap gap-2 mb-5">
-        {filterChips.map((c) => (
+        {filterChips.map(c => (
           <button
             key={c.key}
             type="button"
@@ -672,7 +698,7 @@ function LiveActivityFullPage({
           </tr>
         </thead>
         <tbody className="divide-y divide-[#eff5f5]">
-          {filtered.map((p) => {
+          {filtered.map(p => {
             const elapsed = elapsedSec(p.startedAt, now);
             const flagged = elapsed > p.thresholdSeconds;
             return (
@@ -694,7 +720,9 @@ function LiveActivityFullPage({
                 </td>
                 <td className="py-2.5 text-right">
                   {flagged ? (
-                    <span className="text-[#ba1a1a] font-semibold">Overdue ⚠</span>
+                    <span className="text-[#ba1a1a] font-semibold">
+                      Overdue ⚠
+                    </span>
                   ) : (
                     <span className="text-[#00666e]">On time</span>
                   )}
@@ -704,7 +732,10 @@ function LiveActivityFullPage({
           })}
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={6} className="py-8 text-center text-[#6d797b] text-sm">
+              <td
+                colSpan={6}
+                className="py-8 text-center text-[#6d797b] text-sm"
+              >
                 No passes match this filter.
               </td>
             </tr>
@@ -754,23 +785,32 @@ function LiveRostersPage({
               📋 Live Rosters
             </h2>
             <p className="text-sm text-[#3d494a]">
-              Confirm every student&apos;s location in real time. Use this for fire drills,
-              lockdowns, head counts, or audits. Refreshes every second.
+              Confirm every student&apos;s location in real time. Use this for
+              fire drills, lockdowns, head counts, or audits. Refreshes every
+              second.
             </p>
           </div>
           <div className="flex gap-3 text-sm">
             <div className="bg-[#eff5f5] rounded-lg px-4 py-2">
-              <div className="text-[10px] uppercase text-[#6d797b] font-semibold">Total</div>
-              <div className="font-['Lexend',sans-serif] font-bold text-2xl">{totalStudents}</div>
+              <div className="text-[10px] uppercase text-[#6d797b] font-semibold">
+                Total
+              </div>
+              <div className="font-['Lexend',sans-serif] font-bold text-2xl">
+                {totalStudents}
+              </div>
             </div>
             <div className="bg-[#eff5f5] rounded-lg px-4 py-2">
-              <div className="text-[10px] uppercase text-[#6d797b] font-semibold">In class</div>
+              <div className="text-[10px] uppercase text-[#6d797b] font-semibold">
+                In class
+              </div>
               <div className="font-['Lexend',sans-serif] font-bold text-2xl text-[#00666e]">
                 {inClassCount}
               </div>
             </div>
             <div className="bg-[#eff5f5] rounded-lg px-4 py-2">
-              <div className="text-[10px] uppercase text-[#6d797b] font-semibold">Out of class</div>
+              <div className="text-[10px] uppercase text-[#6d797b] font-semibold">
+                Out of class
+              </div>
               <div className="font-['Lexend',sans-serif] font-bold text-2xl text-[#ba1a1a]">
                 {outCount}
               </div>
@@ -783,8 +823,13 @@ function LiveRostersPage({
         Out of class — by location
       </h3>
       <div className="grid grid-cols-4 gap-4 mb-6">
-        {OUT_LOCATIONS.map((loc) => (
-          <LocationBucketCard key={loc} location={loc} entries={byLocation[loc]} now={now} />
+        {OUT_LOCATIONS.map(loc => (
+          <LocationBucketCard
+            key={loc}
+            location={loc}
+            entries={byLocation[loc]}
+            now={now}
+          />
         ))}
       </div>
 
@@ -792,7 +837,7 @@ function LiveRostersPage({
         Class rosters
       </h3>
       <div className="grid grid-cols-2 gap-4">
-        {classRosters.map((cls) => (
+        {classRosters.map(cls => (
           <ClassRosterCard key={cls.id} cls={cls} />
         ))}
       </div>
@@ -821,7 +866,9 @@ function LocationBucketCard({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span>{icon[location]}</span>
-          <h4 className="font-['Lexend',sans-serif] font-semibold">{location}</h4>
+          <h4 className="font-['Lexend',sans-serif] font-semibold">
+            {location}
+          </h4>
         </div>
         <span className="bg-[#eff5f5] text-[#3d494a] px-2 py-0.5 rounded-full text-sm font-['Lexend',sans-serif] font-bold">
           {entries.length}
@@ -831,8 +878,10 @@ function LocationBucketCard({
         <div className="text-xs text-[#6d797b] italic">No students here</div>
       ) : (
         <ul className="space-y-2 text-sm">
-          {entries.map((e) => {
-            const startedAt = new Date(Date.now() - e.outSinceSeconds * 1000).toISOString();
+          {entries.map(e => {
+            const startedAt = new Date(
+              Date.now() - e.outSinceSeconds * 1000,
+            ).toISOString();
             const elapsed = elapsedSec(startedAt, now);
             const flagged = elapsed > e.thresholdSeconds;
             return (
@@ -869,15 +918,15 @@ function LocationBucketCard({
 
 function ClassRosterCard({ cls }: { cls: ClassRoster }) {
   const [expanded, setExpanded] = useState(true);
-  const inClass = cls.students.filter((s) => s.location === 'in_class');
-  const out = cls.students.filter((s) => s.location !== 'in_class');
+  const inClass = cls.students.filter(s => s.location === 'in_class');
+  const out = cls.students.filter(s => s.location !== 'in_class');
   const allAccounted = out.length === 0;
 
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm">
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
+        onClick={() => setExpanded(v => !v)}
         className="w-full flex items-start justify-between mb-3 text-left"
       >
         <div>
@@ -887,7 +936,9 @@ function ClassRosterCard({ cls }: { cls: ClassRoster }) {
           <div className="text-xs text-[#6d797b]">{cls.className}</div>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-[#00666e] font-semibold">{inClass.length} in</span>
+          <span className="text-[#00666e] font-semibold">
+            {inClass.length} in
+          </span>
           <span className="text-[#6d797b]">·</span>
           <span
             className={
@@ -913,7 +964,7 @@ function ClassRosterCard({ cls }: { cls: ClassRoster }) {
                 Out of class
               </div>
               <ul className="space-y-1 text-sm">
-                {out.map((s) => (
+                {out.map(s => (
                   <li key={s.id} className="flex justify-between">
                     <span className="font-semibold">{s.name}</span>
                     <span className="text-[#3d494a]">→ {s.location}</span>
@@ -928,7 +979,7 @@ function ClassRosterCard({ cls }: { cls: ClassRoster }) {
               In class ({inClass.length})
             </div>
             <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-              {inClass.map((s) => (
+              {inClass.map(s => (
                 <li key={s.id} className="text-[#3d494a]">
                   {s.name}
                 </li>
@@ -943,21 +994,33 @@ function ClassRosterCard({ cls }: { cls: ClassRoster }) {
 
 type AttendanceStatus = 'present' | 'absent' | 'tardy' | 'excused';
 
-const ATTENDANCE_OPTIONS: { key: AttendanceStatus; label: string; color: string }[] = [
+const ATTENDANCE_OPTIONS: {
+  key: AttendanceStatus;
+  label: string;
+  color: string;
+}[] = [
   { key: 'present', label: 'Present', color: '#00666e' },
   { key: 'absent', label: 'Absent', color: '#ba1a1a' },
   { key: 'tardy', label: 'Tardy', color: '#b27800' },
   { key: 'excused', label: 'Excused', color: '#3d494a' },
 ];
 
-const allPresentMarks = (cls: ClassRoster): Record<string, AttendanceStatus> => {
+const allPresentMarks = (
+  cls: ClassRoster,
+): Record<string, AttendanceStatus> => {
   const next: Record<string, AttendanceStatus> = {};
   for (const s of cls.students) next[s.id] = 'present';
   return next;
 };
 
 function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
-  const fallback: ClassRoster = { id: '', className: '', teacherName: '', room: '', students: [] };
+  const fallback: ClassRoster = {
+    id: '',
+    className: '',
+    teacherName: '',
+    room: '',
+    students: [],
+  };
   const [classId, setClassId] = useState(classRosters[0]?.id ?? '');
   const [marks, setMarks] = useState<Record<string, AttendanceStatus>>(() =>
     allPresentMarks(classRosters[0] ?? fallback),
@@ -972,7 +1035,8 @@ function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
     }
   }, [classRosters, classId]);
 
-  const cls = classRosters.find((c) => c.id === classId) ?? classRosters[0] ?? fallback;
+  const cls =
+    classRosters.find(c => c.id === classId) ?? classRosters[0] ?? fallback;
 
   // Default every student to "present" when the active class changes.
   useEffect(() => {
@@ -996,7 +1060,7 @@ function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
   }, [sortedRoster, marks]);
 
   const setStatus = (studentId: string, status: AttendanceStatus) => {
-    setMarks((prev) => ({ ...prev, [studentId]: status }));
+    setMarks(prev => ({ ...prev, [studentId]: status }));
     setSubmittedAt(null);
   };
 
@@ -1019,7 +1083,7 @@ function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
           Class
         </div>
         <div className="flex flex-wrap gap-2">
-          {classRosters.map((c) => {
+          {classRosters.map(c => {
             const lastName = c.teacherName.split(' ').slice(-1)[0];
             const room = c.room.replace('Rm ', '');
             return (
@@ -1071,7 +1135,7 @@ function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
       {/* Roster */}
       <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
         <ul className="divide-y divide-[#eff5f5]">
-          {sortedRoster.map((s) => {
+          {sortedRoster.map(s => {
             const m = marks[s.id];
             return (
               <li
@@ -1080,7 +1144,7 @@ function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
               >
                 <span className="font-semibold text-sm">{s.name}</span>
                 <div className="flex gap-1.5 flex-shrink-0">
-                  {ATTENDANCE_OPTIONS.map((opt) => {
+                  {ATTENDANCE_OPTIONS.map(opt => {
                     const selected = m === opt.key;
                     return (
                       <button
@@ -1092,7 +1156,9 @@ function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
                             ? 'px-3 py-1.5 rounded-lg text-white text-xs font-medium min-w-[70px]'
                             : 'px-3 py-1.5 rounded-lg bg-[#eff5f5] text-[#3d494a] text-xs hover:bg-[#eff5f5]/70 min-w-[70px]'
                         }
-                        style={selected ? { backgroundColor: opt.color } : undefined}
+                        style={
+                          selected ? { backgroundColor: opt.color } : undefined
+                        }
                       >
                         {opt.label}
                       </button>
@@ -1148,22 +1214,6 @@ function CountTile({
   );
 }
 
-function ComingSoon({ section }: { section: SectionKey }) {
-  return (
-    <div className="bg-white rounded-xl p-12 shadow-sm flex flex-col items-center justify-center text-center min-h-[60vh]">
-      <div className="text-5xl mb-4">🚧</div>
-      <h2 className="font-['Lexend',sans-serif] text-xl font-semibold mb-2">
-        {SECTION_TITLES[section]}
-      </h2>
-      <p className="text-sm text-[#6d797b] max-w-md">
-        This section isn&apos;t built yet. Overview, Live Rosters, and Attendance are the live
-        demo surfaces for the hackathon — pick another tab to come back.
-      </p>
-    </div>
-  );
-}
-
-
 function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<TranscriptTurnApi[]>([]);
@@ -1201,12 +1251,12 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
       </div>
       {recent.length === 0 ? (
         <p className="text-sm text-[#6d797b]">
-          No voice-agent conversations yet. Start one in the outbound voice agent and it will land
-          here within a second.
+          No voice-agent conversations yet. Start one in the outbound voice
+          agent and it will land here within a second.
         </p>
       ) : (
         <ul className="divide-y divide-[#eff5f5]">
-          {recent.map((c) => {
+          {recent.map(c => {
             const open = expandedId === c.id;
             return (
               <li key={c.id} className="py-3">
@@ -1217,7 +1267,9 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-semibold text-sm">{c.studentName}</span>
+                      <span className="font-semibold text-sm">
+                        {c.studentName}
+                      </span>
                       <span className="text-[10px] uppercase tracking-wide bg-[#eff5f5] text-[#3d494a] px-1.5 py-0.5 rounded">
                         {c.scenario}
                       </span>
@@ -1233,7 +1285,9 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
                       )}
                     </div>
                     {c.excuseSummary && (
-                      <p className="text-sm text-[#3d494a] truncate">{c.excuseSummary}</p>
+                      <p className="text-sm text-[#3d494a] truncate">
+                        {c.excuseSummary}
+                      </p>
                     )}
                     <p className="text-xs text-[#6d797b] mt-0.5">
                       {new Date(c.callEndedAt).toLocaleTimeString([], {
@@ -1243,15 +1297,20 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
                       {c.language && ` · ${c.language}`}
                     </p>
                   </div>
-                  <span className="text-xs text-[#6d797b] mt-2 select-none">{open ? '▾' : '▸'}</span>
+                  <span className="text-xs text-[#6d797b] mt-2 select-none">
+                    {open ? '▾' : '▸'}
+                  </span>
                 </button>
                 {open && (
                   <div className="mt-2 ml-2 pl-3 border-l-2 border-[#eff5f5]">
                     {loadingId === c.id ? (
-                      <p className="text-xs text-[#6d797b] py-2">Loading transcript…</p>
+                      <p className="text-xs text-[#6d797b] py-2">
+                        Loading transcript…
+                      </p>
                     ) : transcript.length === 0 ? (
                       <p className="text-xs text-[#6d797b] py-2">
-                        Voice agent didn&apos;t persist a transcript for this call.
+                        Voice agent didn&apos;t persist a transcript for this
+                        call.
                       </p>
                     ) : (
                       <ul className="space-y-1.5 py-2">
@@ -1259,7 +1318,9 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
                           <li key={i} className="text-sm">
                             <span
                               className={`inline-block min-w-[70px] mr-2 text-[10px] uppercase font-bold tracking-wide ${
-                                t.speaker === 'agent' ? 'text-[#00666e]' : 'text-[#3d494a]'
+                                t.speaker === 'agent'
+                                  ? 'text-[#00666e]'
+                                  : 'text-[#3d494a]'
                               }`}
                             >
                               {t.speaker}
@@ -1280,11 +1341,13 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
   );
 }
 
-
 // ---------- AlertsPage: scrollable feed for the principal ----------
 
 function severityChip(severity: AlertSummaryApi['severity']) {
-  const palette: Record<AlertSummaryApi['severity'], { bg: string; fg: string }> = {
+  const palette: Record<
+    AlertSummaryApi['severity'],
+    { bg: string; fg: string }
+  > = {
     low: { bg: '#eff5f5', fg: '#3d494a' },
     medium: { bg: '#fef3e2', fg: '#b27800' },
     high: { bg: '#fde8e7', fg: '#ba1a1a' },
@@ -1302,11 +1365,12 @@ function severityChip(severity: AlertSummaryApi['severity']) {
 }
 
 function statusChip(status: AlertSummaryApi['status']) {
-  const palette: Record<AlertSummaryApi['status'], { bg: string; fg: string }> = {
-    OPEN: { bg: '#fde8e7', fg: '#ba1a1a' },
-    ACKNOWLEDGED: { bg: '#fef3e2', fg: '#b27800' },
-    RESOLVED: { bg: '#dff5f6', fg: '#00666e' },
-  };
+  const palette: Record<AlertSummaryApi['status'], { bg: string; fg: string }> =
+    {
+      OPEN: { bg: '#fde8e7', fg: '#ba1a1a' },
+      ACKNOWLEDGED: { bg: '#fef3e2', fg: '#b27800' },
+      RESOLVED: { bg: '#dff5f6', fg: '#00666e' },
+    };
   const c = palette[status];
   return (
     <span
@@ -1353,31 +1417,37 @@ function AlertsPage({
     return () => clearInterval(id);
   }, []);
 
-  const [statusFilter, setStatusFilter] = useState<'all' | AlertSummaryApi['status']>(
-    'all',
-  );
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | AlertSummaryApi['status']
+  >('all');
   const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
-  const [transcriptCache, setTranscriptCache] = useState<Record<string, TranscriptTurnApi[]>>(
-    {},
+  const [transcriptCache, setTranscriptCache] = useState<
+    Record<string, TranscriptTurnApi[]>
+  >({});
+  const [transcriptLoading, setTranscriptLoading] = useState<string | null>(
+    null,
   );
-  const [transcriptLoading, setTranscriptLoading] = useState<string | null>(null);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
 
   const filteredAlerts = useMemo(() => {
     if (statusFilter === 'all') return alerts;
-    return alerts.filter((a) => a.status === statusFilter);
+    return alerts.filter(a => a.status === statusFilter);
   }, [alerts, statusFilter]);
 
-  const openCount = useMemo(() => alerts.filter((a) => a.status === 'OPEN').length, [alerts]);
+  const openCount = useMemo(
+    () => alerts.filter(a => a.status === 'OPEN').length,
+    [alerts],
+  );
   const ackCount = useMemo(
-    () => alerts.filter((a) => a.status === 'ACKNOWLEDGED').length,
+    () => alerts.filter(a => a.status === 'ACKNOWLEDGED').length,
     [alerts],
   );
   const todayCalls = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const t = start.getTime();
-    return voiceCalls.filter((c) => new Date(c.callEndedAt).getTime() >= t).length;
+    return voiceCalls.filter(c => new Date(c.callEndedAt).getTime() >= t)
+      .length;
   }, [voiceCalls]);
 
   const toggleCall = async (id: string) => {
@@ -1391,7 +1461,10 @@ function AlertsPage({
       setTranscriptLoading(id);
       try {
         const detail = await getVoiceCall(id);
-        setTranscriptCache((prev) => ({ ...prev, [id]: detail.transcript ?? [] }));
+        setTranscriptCache(prev => ({
+          ...prev,
+          [id]: detail.transcript ?? [],
+        }));
       } catch (e: unknown) {
         setTranscriptError((e as Error).message);
       } finally {
@@ -1409,13 +1482,16 @@ function AlertsPage({
               🚨 Alerts &amp; Conversations
             </h2>
             <p className="text-sm text-[#3d494a]">
-              Live feed of every threshold breach the rule engine raised, plus every parent
-              call the attendance agent has wrapped up. Updates within seconds via WebSocket.
+              Live feed of every threshold breach the rule engine raised, plus
+              every parent call the attendance agent has wrapped up. Updates
+              within seconds via WebSocket.
             </p>
           </div>
           <div className="flex gap-3 text-sm">
             <div className="bg-[#fde8e7] rounded-lg px-4 py-2">
-              <div className="text-[10px] uppercase text-[#ba1a1a] font-semibold">Open</div>
+              <div className="text-[10px] uppercase text-[#ba1a1a] font-semibold">
+                Open
+              </div>
               <div className="font-['Lexend',sans-serif] font-bold text-2xl text-[#ba1a1a]">
                 {openCount}
               </div>
@@ -1448,7 +1524,7 @@ function AlertsPage({
               🔔 Alerts
             </h3>
             <div className="flex gap-1">
-              {(['all', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED'] as const).map((s) => (
+              {(['all', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED'] as const).map(s => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -1472,10 +1548,13 @@ function AlertsPage({
               </p>
             ) : (
               <ul className="divide-y divide-[#eff5f5]">
-                {filteredAlerts.map((a) => {
+                {filteredAlerts.map(a => {
                   const ctx = summarizeContext(a.context);
                   return (
-                    <li key={a.id} className="p-4 hover:bg-[#f7f9f9] transition-colors">
+                    <li
+                      key={a.id}
+                      className="p-4 hover:bg-[#f7f9f9] transition-colors"
+                    >
                       <div className="flex items-baseline gap-2 mb-1 flex-wrap">
                         {severityChip(a.severity)}
                         {statusChip(a.status)}
@@ -1483,7 +1562,9 @@ function AlertsPage({
                           {relativeTime(a.createdAt, now)}
                         </span>
                       </div>
-                      <p className="text-sm font-semibold mb-0.5">{a.studentName}</p>
+                      <p className="text-sm font-semibold mb-0.5">
+                        {a.studentName}
+                      </p>
                       <p className="text-xs text-[#3d494a] mb-1">
                         <code className="bg-[#eff5f5] px-1 py-0.5 rounded text-[11px]">
                           {a.ruleKey}
@@ -1511,12 +1592,12 @@ function AlertsPage({
           <div className="overflow-y-auto flex-1">
             {voiceCalls.length === 0 ? (
               <p className="p-6 text-sm text-[#6d797b] text-center">
-                No conversations yet. The attendance officer agent will report each finished
-                parent call here.
+                No conversations yet. The attendance officer agent will report
+                each finished parent call here.
               </p>
             ) : (
               <ul className="divide-y divide-[#eff5f5]">
-                {voiceCalls.map((c) => {
+                {voiceCalls.map(c => {
                   const open = expandedCallId === c.id;
                   const turns = transcriptCache[c.id];
                   return (
@@ -1548,15 +1629,21 @@ function AlertsPage({
                             {open ? '▾' : '▸'}
                           </span>
                         </div>
-                        <p className="text-sm font-semibold mb-0.5">{c.studentName}</p>
+                        <p className="text-sm font-semibold mb-0.5">
+                          {c.studentName}
+                        </p>
                         {c.excuseSummary && (
-                          <p className="text-xs text-[#3d494a]">{c.excuseSummary}</p>
+                          <p className="text-xs text-[#3d494a]">
+                            {c.excuseSummary}
+                          </p>
                         )}
                       </button>
                       {open && (
                         <div className="px-4 pb-4 ml-2 pl-3 border-l-2 border-[#eff5f5]">
                           {transcriptLoading === c.id ? (
-                            <p className="text-xs text-[#6d797b] py-2">Loading transcript…</p>
+                            <p className="text-xs text-[#6d797b] py-2">
+                              Loading transcript…
+                            </p>
                           ) : transcriptError ? (
                             <p className="text-xs text-[#ba1a1a] py-2">
                               Failed to load transcript: {transcriptError}
@@ -1578,7 +1665,9 @@ function AlertsPage({
                                   >
                                     {t.speaker}
                                   </span>
-                                  <span className="text-[#171d1e]">{t.text}</span>
+                                  <span className="text-[#171d1e]">
+                                    {t.text}
+                                  </span>
                                 </li>
                               ))}
                             </ul>

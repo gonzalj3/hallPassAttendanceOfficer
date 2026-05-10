@@ -35,17 +35,28 @@ function MicrosoftIcon() {
   );
 }
 
+function Spinner() {
+  return (
+    <svg className="animate-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="#d1d5db" strokeWidth="3" />
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="#6b7280" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
+  const [signingIn, setSigningIn] = useState<'google' | 'microsoft' | null>(null);
 
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault();
     navigate('/classes');
   };
 
-  const handleSSOLogin = () => {
-    navigate('/classes');
+  const handleSSOLogin = (provider: 'google' | 'microsoft') => {
+    setSigningIn(provider);
+    setTimeout(() => navigate('/classes'), 1500);
   };
 
   return (
@@ -109,18 +120,20 @@ export function LoginPage() {
           {/* SSO Buttons */}
           <div className="space-y-3 mb-6">
             <button
-              onClick={handleSSOLogin}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg min-h-[44px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 active:bg-gray-300"
+              onClick={() => handleSSOLogin('google')}
+              disabled={signingIn !== null}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg min-h-[44px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 active:bg-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <GoogleIcon />
-              <span>Sign in with Google</span>
+              {signingIn === 'google' ? <Spinner /> : <GoogleIcon />}
+              <span>{signingIn === 'google' ? 'Signing in…' : 'Sign in with Google'}</span>
             </button>
             <button
-              onClick={handleSSOLogin}
-              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg min-h-[44px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 active:bg-gray-300"
+              onClick={() => handleSSOLogin('microsoft')}
+              disabled={signingIn !== null}
+              className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-lg min-h-[44px] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 active:bg-gray-300 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <MicrosoftIcon />
-              <span>Sign in with Microsoft</span>
+              {signingIn === 'microsoft' ? <Spinner /> : <MicrosoftIcon />}
+              <span>{signingIn === 'microsoft' ? 'Signing in…' : 'Sign in with Microsoft'}</span>
             </button>
           </div>
 
