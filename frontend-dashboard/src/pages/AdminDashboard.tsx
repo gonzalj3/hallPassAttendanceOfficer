@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   mockKpis,
-  mockActivePasses,
   mockTopStudents,
   mockClassroomVolume,
   mockHourlyToday,
   mockHourlyAvg,
   hourLabels,
-  mockClassRosters,
-  mockOutOfClass,
   type ActivePass,
   type ClassroomVolume,
   type TopStudent,
@@ -16,6 +13,10 @@ import {
   type ClassRoster,
   type OutOfClassEntry,
 } from '../data/mockAdmin';
+import { useDashboardData } from '../hooks/useDashboardData';
+import type { VoiceCallSummaryApi } from '../api/types';
+import { getVoiceCall } from '../api/client';
+import type { TranscriptTurnApi } from '../api/types';
 
 type DateRange = 'today' | 'week' | 'month';
 
@@ -107,6 +108,10 @@ export default function AdminDashboard() {
   const [section, setSection] = useState<SectionKey>('overview');
   const [now, setNow] = useState(Date.now());
 
+  // Live data from the ABE backend. Replaces every mockActivePasses /
+  // mockClassRosters / mockOutOfClass usage; voice calls + alerts are new.
+  const data = useDashboardData();
+
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -114,12 +119,17 @@ export default function AdminDashboard() {
 
   const flaggedNow = useMemo(
     () =>
-      mockActivePasses.filter((p) => elapsedSec(p.startedAt, now) > p.thresholdSeconds)
+      data.activePasses.filter((p) => elapsedSec(p.startedAt, now) > p.thresholdSeconds)
         .length,
-    [now],
+    [now, data.activePasses],
   );
 
-  const kpis = useMemo(() => kpisFor(range, flaggedNow), [range, flaggedNow]);
+  const kpis = useMemo(() => {
+    const base = kpisFor(range, flaggedNow);
+    return range === 'today'
+      ? { ...base, outNow: data.outOfClass.length }
+      : base;
+  }, [range, flaggedNow, data.outOfClass.length]);
   const classroomVolume = useMemo(() => classroomVolumeFor(range), [range]);
   const topStudents = useMemo(() => topStudentsFor(range), [range]);
 
@@ -139,30 +149,42 @@ export default function AdminDashboard() {
           section={section}
           showRangeFilter={showRangeFilter}
         />
+        {data.error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {data.error}. Showing placeholder volume / leaderboard until backend reconnects.
+          </div>
+        )}
         {section === 'overview' && (
           <>
             <KpiStrip kpis={kpis} />
             <div className="grid grid-cols-12 gap-5">
               <LiveActivityCard
-                passes={mockActivePasses}
+                passes={data.activePasses}
                 now={now}
                 onViewAll={() => setSection('live_activity')}
               />
               <ClassroomVolumeCard volume={classroomVolume} range={range} />
               <HourlyChartCard range={range} />
               <FrequentFlyersCard students={topStudents} range={range} />
+              <VoiceCallsCard calls={data.voiceCalls} />
             </div>
           </>
         )}
-        {section === 'live_rosters' && <LiveRostersPage now={now} />}
+        {section === 'live_rosters' && (
+          <LiveRostersPage
+            now={now}
+            classRosters={data.classRosters}
+            outOfClass={data.outOfClass}
+          />
+        )}
         {section === 'live_activity' && (
           <LiveActivityFullPage
-            passes={mockActivePasses}
+            passes={data.activePasses}
             now={now}
             onBack={() => setSection('overview')}
           />
         )}
-        {section === 'attendance' && <AttendancePage />}
+        {section === 'attendance' && <AttendancePage classRosters={data.classRosters} />}
         {(section === 'students' ||
           section === 'classrooms' ||
           section === 'alerts' ||
@@ -703,9 +725,17 @@ function LiveActivityFullPage({
   );
 }
 
-function LiveRostersPage({ now }: { now: number }) {
-  const totalStudents = mockKpis.totalStudents;
-  const outCount = mockOutOfClass.length;
+function LiveRostersPage({
+  now,
+  classRosters,
+  outOfClass,
+}: {
+  now: number;
+  classRosters: ClassRoster[];
+  outOfClass: OutOfClassEntry[];
+}) {
+  const totalStudents = classRosters.reduce((n, c) => n + c.students.length, 0);
+  const outCount = outOfClass.length;
   const inClassCount = totalStudents - outCount;
 
   const byLocation = useMemo(() => {
@@ -715,12 +745,15 @@ function LiveRostersPage({ now }: { now: number }) {
       Office: [],
       Hallway: [],
     };
-    for (const o of mockOutOfClass) map[o.destination].push(o);
+    for (const o of outOfClass) {
+      const slot = map[o.destination as OutLocation];
+      if (slot) slot.push(o);
+    }
     for (const loc of OUT_LOCATIONS) {
       map[loc].sort((a, b) => b.outSinceSeconds - a.outSinceSeconds);
     }
     return map;
-  }, []);
+  }, [outOfClass]);
 
   return (
     <div>
@@ -769,7 +802,7 @@ function LiveRostersPage({ now }: { now: number }) {
         Class rosters
       </h3>
       <div className="grid grid-cols-2 gap-4">
-        {mockClassRosters.map((cls) => (
+        {classRosters.map((cls) => (
           <ClassRosterCard key={cls.id} cls={cls} />
         ))}
       </div>
@@ -933,14 +966,23 @@ const allPresentMarks = (cls: ClassRoster): Record<string, AttendanceStatus> => 
   return next;
 };
 
-function AttendancePage() {
-  const [classId, setClassId] = useState(mockClassRosters[0].id);
+function AttendancePage({ classRosters }: { classRosters: ClassRoster[] }) {
+  const fallback: ClassRoster = { id: '', className: '', teacherName: '', room: '', students: [] };
+  const [classId, setClassId] = useState(classRosters[0]?.id ?? '');
   const [marks, setMarks] = useState<Record<string, AttendanceStatus>>(() =>
-    allPresentMarks(mockClassRosters[0]),
+    allPresentMarks(classRosters[0] ?? fallback),
   );
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
 
-  const cls = mockClassRosters.find((c) => c.id === classId)!;
+  // Re-seed when rosters arrive after mount.
+  useEffect(() => {
+    if (!classId && classRosters[0]) {
+      setClassId(classRosters[0].id);
+      setMarks(allPresentMarks(classRosters[0]));
+    }
+  }, [classRosters, classId]);
+
+  const cls = classRosters.find((c) => c.id === classId) ?? classRosters[0] ?? fallback;
 
   // Default every student to "present" when the active class changes.
   useEffect(() => {
@@ -987,7 +1029,7 @@ function AttendancePage() {
           Class
         </div>
         <div className="flex flex-wrap gap-2">
-          {mockClassRosters.map((c) => {
+          {classRosters.map((c) => {
             const lastName = c.teacherName.split(' ').slice(-1)[0];
             const room = c.room.replace('Rm ', '');
             return (
@@ -1127,6 +1169,123 @@ function ComingSoon({ section }: { section: SectionKey }) {
         This section isn&apos;t built yet. Overview, Live Rosters, and Attendance are the live
         demo surfaces for the hackathon — pick another tab to come back.
       </p>
+    </div>
+  );
+}
+
+
+function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState<TranscriptTurnApi[]>([]);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+
+  const toggle = async (id: string) => {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setTranscript([]);
+      return;
+    }
+    setExpandedId(id);
+    setLoadingId(id);
+    try {
+      const detail = await getVoiceCall(id);
+      setTranscript(detail.transcript ?? []);
+    } catch {
+      setTranscript([]);
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const recent = calls.slice(0, 5);
+
+  return (
+    <div className="col-span-12 bg-white border border-[#eff5f5] rounded-xl p-5 shadow-sm">
+      <div className="flex items-baseline justify-between mb-3">
+        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
+          📞 Recent Guardian Calls
+        </h3>
+        <span className="text-xs text-[#6d797b]">
+          {calls.length} total · live updates from voice agent
+        </span>
+      </div>
+      {recent.length === 0 ? (
+        <p className="text-sm text-[#6d797b]">
+          No voice-agent conversations yet. Start one in the outbound voice agent and it will land
+          here within a second.
+        </p>
+      ) : (
+        <ul className="divide-y divide-[#eff5f5]">
+          {recent.map((c) => {
+            const open = expandedId === c.id;
+            return (
+              <li key={c.id} className="py-3">
+                <button
+                  type="button"
+                  onClick={() => void toggle(c.id)}
+                  className="w-full text-left flex items-start gap-3 hover:bg-[#f7f9f9] p-2 rounded-lg transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="font-semibold text-sm">{c.studentName}</span>
+                      <span className="text-[10px] uppercase tracking-wide bg-[#eff5f5] text-[#3d494a] px-1.5 py-0.5 rounded">
+                        {c.scenario}
+                      </span>
+                      {c.parentConfirmed === true && (
+                        <span className="text-[10px] uppercase tracking-wide bg-[#dff5f6] text-[#00666e] px-1.5 py-0.5 rounded">
+                          confirmed
+                        </span>
+                      )}
+                      {c.alertId && (
+                        <span className="text-[10px] uppercase tracking-wide bg-[#fef3e2] text-[#b27800] px-1.5 py-0.5 rounded">
+                          alert-driven
+                        </span>
+                      )}
+                    </div>
+                    {c.excuseSummary && (
+                      <p className="text-sm text-[#3d494a] truncate">{c.excuseSummary}</p>
+                    )}
+                    <p className="text-xs text-[#6d797b] mt-0.5">
+                      {new Date(c.callEndedAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                      {c.language && ` · ${c.language}`}
+                    </p>
+                  </div>
+                  <span className="text-xs text-[#6d797b] mt-2 select-none">{open ? '▾' : '▸'}</span>
+                </button>
+                {open && (
+                  <div className="mt-2 ml-2 pl-3 border-l-2 border-[#eff5f5]">
+                    {loadingId === c.id ? (
+                      <p className="text-xs text-[#6d797b] py-2">Loading transcript…</p>
+                    ) : transcript.length === 0 ? (
+                      <p className="text-xs text-[#6d797b] py-2">
+                        Voice agent didn&apos;t persist a transcript for this call.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1.5 py-2">
+                        {transcript.map((t, i) => (
+                          <li key={i} className="text-sm">
+                            <span
+                              className={`inline-block min-w-[70px] mr-2 text-[10px] uppercase font-bold tracking-wide ${
+                                t.speaker === 'agent' ? 'text-[#00666e]' : 'text-[#3d494a]'
+                              }`}
+                            >
+                              {t.speaker}
+                            </span>
+                            <span className="text-[#171d1e]">{t.text}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

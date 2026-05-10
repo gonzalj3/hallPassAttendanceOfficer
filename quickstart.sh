@@ -3,11 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$ROOT_DIR/frontend"
+DASHBOARD_DIR="$ROOT_DIR/frontend-dashboard"
 VOICE_DIR="$ROOT_DIR/outbound-voice-agent"
 ENV_FILE="$ROOT_DIR/.env"
 VENV_DIR="$ROOT_DIR/.venv"
 VOICE_PORT="${PORT:-5178}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+DASHBOARD_PORT="${DASHBOARD_PORT:-3100}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cp "$ROOT_DIR/.env.example" "$ENV_FILE"
@@ -26,6 +28,7 @@ set +a
 
 VOICE_PORT="${PORT:-5178}"
 FRONTEND_PORT="${FRONTEND_PORT:-3000}"
+DASHBOARD_PORT="${DASHBOARD_PORT:-3100}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 OPENAI_API_KEY_VALUE="${OPENAI_API_KEY:-}"
 DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://hpao:hpao@localhost:5432/hpao}"
@@ -143,6 +146,9 @@ fi
 printf 'Installing Teacher Dashboard / Hall Pass iPad dependencies...\n'
 npm_install_app "$FRONTEND_DIR" "Teacher Dashboard / Hall Pass iPad"
 
+printf 'Installing Admin Dashboard dependencies...\n'
+npm_install_app "$DASHBOARD_DIR" "Admin Dashboard"
+
 printf 'Installing Outbound Voice Agent dependencies...\n'
 npm_install_app "$VOICE_DIR" "Outbound Voice Agent"
 
@@ -157,12 +163,17 @@ printf 'Starting Teacher Dashboard and Hall Pass iPad app...\n'
 npm --prefix "$FRONTEND_DIR" run dev -- --host 127.0.0.1 --port "$FRONTEND_PORT" &
 PIDS+=("$!")
 
+printf 'Starting Admin Dashboard...\n'
+npm --prefix "$DASHBOARD_DIR" run dev -- --host 127.0.0.1 --port "$DASHBOARD_PORT" &
+PIDS+=("$!")
+
 printf 'Starting Outbound Voice Agent...\n'
 npm --prefix "$VOICE_DIR" start &
 PIDS+=("$!")
 
 TEACHER_DASHBOARD_URL="http://localhost:${FRONTEND_PORT}/classes"
 IPAD_APP_URL="http://localhost:${FRONTEND_PORT}/classes"
+ADMIN_DASHBOARD_URL="http://localhost:${DASHBOARD_PORT}"
 OUTBOUND_VOICE_AGENT_URL="http://localhost:${VOICE_PORT}"
 BACKEND_HEALTHZ_URL="http://localhost:${BACKEND_PORT}/healthz"
 
@@ -170,15 +181,17 @@ if [[ $BACKEND_AVAILABLE -eq 1 ]]; then
   wait_for_url "$BACKEND_HEALTHZ_URL" "ABE backend"
 fi
 wait_for_url "http://localhost:${FRONTEND_PORT}" "Teacher Dashboard / Hall Pass iPad"
+wait_for_url "$ADMIN_DASHBOARD_URL" "Admin Dashboard"
 wait_for_url "$OUTBOUND_VOICE_AGENT_URL" "Outbound Voice Agent"
 
 printf '\nOpening demo URLs...\n'
 printf 'Teacher Dashboard: %s\n' "$TEACHER_DASHBOARD_URL"
 printf 'Hall Pass iPad:    %s\n' "$IPAD_APP_URL"
+printf 'Admin Dashboard:   %s\n' "$ADMIN_DASHBOARD_URL"
 printf 'Voice Agent:       %s\n' "$OUTBOUND_VOICE_AGENT_URL"
 
 open_url "$TEACHER_DASHBOARD_URL"
-open_url "$IPAD_APP_URL"
+open_url "$ADMIN_DASHBOARD_URL"
 open_url "$OUTBOUND_VOICE_AGENT_URL"
 
 printf '\nAll demo components are running. Press Ctrl+C to stop the local servers.\n'
