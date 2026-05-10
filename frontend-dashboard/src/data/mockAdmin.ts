@@ -247,6 +247,7 @@ export const mockKpis = {
   adoptionPct: 78,
   lockdowns: 0,
   totalStudents,
+  absent: 12,
 };
 
 export const mockTopStudents: TopStudent[] = [

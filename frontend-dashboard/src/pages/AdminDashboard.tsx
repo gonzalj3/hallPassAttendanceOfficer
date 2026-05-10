@@ -28,8 +28,6 @@ type SectionKey =
   | 'live_rosters'
   | 'live_activity'
   | 'attendance'
-  | 'students'
-  | 'classrooms'
   | 'alerts'
   | 'reports'
   | 'settings';
@@ -52,20 +50,14 @@ const RANGE_AVG_DURATION: Record<DateRange, number> = {
   month: 311,
 };
 
-const RANGE_ADOPTION: Record<DateRange, number> = {
-  today: mockKpis.adoptionPct,
-  week: 81,
-  month: 84,
-};
-
 type Kpis = {
   outNow: number;
   totalLabel: string;
   total: number;
   activeFlags: number;
   avgDurationSeconds: number;
-  adoptionPct: number;
   lockdowns: number;
+  absent: number;
 };
 
 const kpisFor = (range: DateRange, flaggedNow: number): Kpis => {
@@ -77,8 +69,8 @@ const kpisFor = (range: DateRange, flaggedNow: number): Kpis => {
     activeFlags:
       range === 'today' ? flaggedNow : range === 'week' ? 11 : 38,
     avgDurationSeconds: RANGE_AVG_DURATION[range],
-    adoptionPct: RANGE_ADOPTION[range],
     lockdowns: range === 'month' ? 1 : 0,
+    absent: range === 'today' ? mockKpis.absent : range === 'week' ? 45 : 120,
   };
 };
 
@@ -99,8 +91,6 @@ const SECTION_TITLES: Record<SectionKey, string> = {
   live_rosters: 'Live Rosters',
   live_activity: 'Live Activity — All Active Passes',
   attendance: 'Attendance',
-  students: 'Students',
-  classrooms: 'Classrooms',
   alerts: 'Alerts',
   reports: 'Reports',
   settings: 'Settings',
@@ -191,9 +181,7 @@ export default function AdminDashboard() {
         {section === 'alerts' && (
           <AlertsPage alerts={data.alerts} voiceCalls={data.voiceCalls} />
         )}
-        {(section === 'students' ||
-          section === 'classrooms' ||
-          section === 'reports' ||
+        {(section === 'reports' ||
           section === 'settings') && <ComingSoon section={section} />}
       </main>
     </div>
@@ -225,8 +213,6 @@ function Sidebar({
       badgeColor: 'bg-[#ba1a1a]',
     },
     { key: 'attendance', icon: '📝', label: 'Attendance' },
-    { key: 'students', icon: '👥', label: 'Students' },
-    { key: 'classrooms', icon: '🏫', label: 'Classrooms' },
     {
       key: 'alerts',
       icon: '🚨',
@@ -343,6 +329,7 @@ function TopBar({
 
 function KpiStrip({ kpis }: { kpis: Kpis }) {
   const tiles = [
+    { label: 'Absent', value: String(kpis.absent) },
     { label: 'Out Now', value: String(kpis.outNow) },
     { label: kpis.totalLabel, value: String(kpis.total) },
     {
@@ -351,12 +338,10 @@ function KpiStrip({ kpis }: { kpis: Kpis }) {
       red: kpis.activeFlags > 0,
     },
     { label: 'Avg Duration', value: formatElapsed(kpis.avgDurationSeconds) },
-    { label: 'Adoption', value: `${kpis.adoptionPct}%` },
-    { label: 'Lockdowns', value: String(kpis.lockdowns) },
   ];
 
   return (
-    <div className="grid grid-cols-6 gap-3 mb-5">
+    <div className="grid grid-cols-5 gap-3 mb-5">
       {tiles.map((t) => (
         <div key={t.label} className="bg-white rounded-xl p-4 shadow-sm">
           <div className="text-[10px] uppercase tracking-wide text-[#6d797b] font-semibold">

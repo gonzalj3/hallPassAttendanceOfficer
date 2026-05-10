@@ -5,6 +5,7 @@ import { ClassSelectPage } from './pages/ClassSelectPage';
 import { RosterPage } from './pages/RosterPage';
 import { DestinationPage } from './pages/DestinationPage';
 import { PassActivePage } from './pages/PassActivePage';
+import AdminDashboard from './pages/AdminDashboard';
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="/roster/:sessionId" element={<RosterPage />} />
           <Route path="/destination/:studentId" element={<DestinationPage />} />
           <Route path="/pass-active" element={<PassActivePage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppProvider>
