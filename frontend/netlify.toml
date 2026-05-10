@@ -1,10 +1,10 @@
-# Netlify build config for the React/Vite frontend in /frontend.
-# The backend (FastAPI) is NOT deployed here — host it separately
-# (Fly.io / Render / Railway) and point VITE_API_URL at it from the
-# Netlify dashboard once Phase 8's REST API ships.
+# Netlify build config for the React/Vite iPad / teacher frontend
+# in /frontend. The Netlify project must have its base directory
+# set to `frontend` in the UI; Netlify then reads this file from
+# the base directory. Set VITE_API_URL / VITE_WS_URL in the
+# project env to point at the Railway backend.
 
 [build]
-  base = "frontend"
   publish = "dist"
   command = "npm ci && npm run build"
 

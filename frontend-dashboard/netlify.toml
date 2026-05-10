@@ -1,0 +1,20 @@
+# Netlify build config for the principal/admin dashboard frontend
+# in /frontend-dashboard. Create this as a SECOND Netlify site
+# pointing at the same GitHub repo, with base directory set to
+# `frontend-dashboard` in the Netlify UI -- Netlify will pick this
+# file up automatically. Set VITE_API_URL / VITE_WS_URL in the
+# dashboard env to point at the Railway backend.
+
+[build]
+  publish = "dist"
+  command = "npm ci && npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback: any path that isn't a real file falls through to
+# index.html so client-side routing handles it.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

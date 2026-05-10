@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 from logging.config import fileConfig
 
 from alembic import context
@@ -17,11 +16,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Resolve sqlalchemy.url: programmatic override (tests) wins, else env via Settings.
-# If neither is set, alembic raises its own clearer error downstream.
+# Resolve sqlalchemy.url: programmatic override (tests) wins, else env via
+# Settings. We deliberately DON'T suppress errors here -- if DATABASE_URL is
+# missing or malformed, the ValidationError from pydantic-settings is far
+# more actionable than the cryptic "Could not parse SQLAlchemy URL" that
+# SQLAlchemy raises later when handed an empty string.
 if not config.get_main_option("sqlalchemy.url"):
-    with contextlib.suppress(Exception):
-        config.set_main_option("sqlalchemy.url", Settings().database_url)
+    config.set_main_option("sqlalchemy.url", Settings().database_url)
 
 target_metadata = Base.metadata
 
