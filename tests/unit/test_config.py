@@ -44,13 +44,19 @@ def test_settings_passes_through_other_explicit_driver() -> None:
     assert s.database_url == "postgresql+psycopg://user:pw@host:5432/db"
 
 
-def test_settings_strips_sslmode_query_param() -> None:
-    """`fly postgres attach` writes ?sslmode=disable; asyncpg rejects it."""
+def test_settings_renames_sslmode_to_ssl() -> None:
+    """`fly postgres attach` writes ?sslmode=disable; asyncpg expects ?ssl=."""
     s = Settings(database_url="postgres://user:pw@host.flycast:5432/db?sslmode=disable")
-    assert s.database_url == "postgresql+asyncpg://user:pw@host.flycast:5432/db"
+    assert s.database_url == "postgresql+asyncpg://user:pw@host.flycast:5432/db?ssl=disable"
 
 
-def test_settings_keeps_other_query_params() -> None:
-    """Don't drop unrelated query params while stripping sslmode."""
+def test_settings_renames_sslmode_require_to_ssl_require() -> None:
+    s = Settings(database_url="postgres://u:p@h:5432/d?sslmode=require")
+    assert s.database_url == "postgresql+asyncpg://u:p@h:5432/d?ssl=require"
+
+
+def test_settings_keeps_other_query_params_alongside_ssl_rename() -> None:
+    """Don't drop unrelated query params while renaming sslmode."""
     s = Settings(database_url="postgres://u:p@h:5432/d?sslmode=disable&application_name=hpao")
-    assert s.database_url == "postgresql+asyncpg://u:p@h:5432/d?application_name=hpao"
+    # urlencode preserves insertion order; sslmode was first.
+    assert s.database_url == "postgresql+asyncpg://u:p@h:5432/d?ssl=disable&application_name=hpao"

@@ -19,20 +19,26 @@ class Settings(BaseSettings):
     @classmethod
     def _normalize_database_url(cls, v: str) -> str:
         """Coerce ``postgres://...?sslmode=...`` URLs into the
-        ``postgresql+asyncpg://...`` form SQLAlchemy 2.0 + asyncpg accepts.
+        ``postgresql+asyncpg://...?ssl=...`` form SQLAlchemy 2.0 +
+        asyncpg accepts.
 
-        ``fly postgres attach`` writes ``postgres://...?sslmode=disable`` into
-        ``DATABASE_URL``. Two things break asyncpg there:
+        ``fly postgres attach`` writes ``postgres://...?sslmode=disable``
+        into ``DATABASE_URL``. Two things break asyncpg there:
 
         1. The ``postgres://`` scheme — SQLAlchemy 2.0 requires a driver,
            e.g. ``postgresql+asyncpg``. Bare ``postgresql://`` likewise.
         2. The ``sslmode`` query param — that's libpq / psycopg syntax;
            asyncpg uses ``ssl=`` and rejects ``sslmode`` as an unknown
-           kwarg. Fly's ``flycast`` hostname goes over Fly's internal
-           wireguard mesh, so no SSL is needed; just drop the param.
+           kwarg. Just stripping the param isn't enough either: asyncpg
+           defaults to attempting TLS, and Fly's ``flycast`` hostname
+           speaks plain Postgres over the internal wireguard mesh, so the
+           handshake hangs. We rename the param to ``ssl=`` and pass the
+           value through (``disable``, ``require``, etc. are all accepted
+           as libpq-compatible mode strings by asyncpg).
 
         URLs already in the asyncpg form (or pinned to another explicit
-        driver like ``postgresql+psycopg``) are passed through unchanged.
+        driver like ``postgresql+psycopg``) are passed through with the
+        same query-param rewrite so callers don't have to think about it.
         """
         if not v.startswith("postgresql+"):
             if v.startswith("postgres://"):
@@ -42,12 +48,13 @@ class Settings(BaseSettings):
 
         parsed = urlparse(v)
         if parsed.query:
-            kept = [
-                (k, val)
-                for k, val in parse_qsl(parsed.query, keep_blank_values=True)
-                if k != "sslmode"
-            ]
-            v = urlunparse(parsed._replace(query=urlencode(kept)))
+            rewritten: list[tuple[str, str]] = []
+            for k, val in parse_qsl(parsed.query, keep_blank_values=True):
+                if k == "sslmode":
+                    rewritten.append(("ssl", val))
+                else:
+                    rewritten.append((k, val))
+            v = urlunparse(parsed._replace(query=urlencode(rewritten)))
         return v
 
     # Inter-agent boundary (Phase 8 + dispatcher). When either is unset the
