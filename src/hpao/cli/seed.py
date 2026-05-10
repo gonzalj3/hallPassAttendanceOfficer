@@ -82,82 +82,126 @@ DEMO_STUDENTS: tuple[tuple[str, str], ...] = (
 
 
 async def seed(db: AsyncSession) -> dict[str, UUID]:
-    existing = (
+    school = (
         await db.execute(select(School).where(School.name == SCHOOL_NAME))
     ).scalar_one_or_none()
-    if existing is not None:
-        logger.info("seed: %s already exists, no-op", SCHOOL_NAME)
-        return {"school_id": existing.id}
 
     today = date.today()
 
-    school = School(name=SCHOOL_NAME, district=SCHOOL_DISTRICT)
-    db.add(school)
-    await db.flush()
+    if school is None:
+        school = School(name=SCHOOL_NAME, district=SCHOOL_DISTRICT)
+        db.add(school)
+        await db.flush()
+    elif school.district is None:
+        school.district = SCHOOL_DISTRICT
 
-    teacher = User(
-        school_id=school.id,
-        email=TEACHER_EMAIL,
-        role="TEACHER",
-        first_name="Demo",
-        last_name="Teacher",
-    )
-    db.add(teacher)
-    await db.flush()
-
-    students = [
-        Student(
+    teacher = (
+        await db.execute(select(User).where(User.email == TEACHER_EMAIL))
+    ).scalar_one_or_none()
+    if teacher is None:
+        teacher = User(
             school_id=school.id,
-            student_number=f"S{idx + 1:03d}",
-            grade_level="10",
-            first_name=first,
-            last_name=last,
-            enrolled_at=today - timedelta(days=60),
+            email=TEACHER_EMAIL,
+            role="TEACHER",
+            first_name="Demo",
+            last_name="Teacher",
         )
-        for idx, (first, last) in enumerate(DEMO_STUDENTS)
-    ]
-    db.add_all(students)
-    await db.flush()
-
-    for spec in DEMO_CLASSES:
-        cls = Class(
-            school_id=school.id,
-            teacher_id=teacher.id,
-            name=str(spec["name"]),
-            subject=str(spec["subject"]),
-            period=str(spec["period"]),
-            room=str(spec["room"]),
-        )
-        db.add(cls)
+        db.add(teacher)
         await db.flush()
 
-        session = ClassSession(
-            class_id=cls.id,
-            date=today,
-            scheduled_start=spec["start"],
-            scheduled_end=spec["end"],
-        )
-        db.add(session)
-
-        # Every demo student is enrolled in every class — keeps the roster
-        # full on each session for a more visually populated demo.
-        for student in students:
-            db.add(
-                ClassEnrollment(
-                    class_id=cls.id,
-                    student_id=student.id,
-                    enrolled_at=today - timedelta(days=60),
+    students: list[Student] = []
+    for idx, (first, last) in enumerate(DEMO_STUDENTS):
+        student_number = f"S{idx + 1:03d}"
+        student = (
+            await db.execute(
+                select(Student).where(
+                    Student.school_id == school.id,
+                    Student.student_number == student_number,
                 )
             )
+        ).scalar_one_or_none()
+        if student is None:
+            student = Student(
+                school_id=school.id,
+                student_number=student_number,
+                grade_level="10",
+                first_name=first,
+                last_name=last,
+                enrolled_at=today - timedelta(days=60),
+            )
+            db.add(student)
+            await db.flush()
+        students.append(student)
+
+    classes: list[Class] = []
+    for spec in DEMO_CLASSES:
+        cls = (
+            await db.execute(
+                select(Class).where(
+                    Class.school_id == school.id,
+                    Class.period == str(spec["period"]),
+                    Class.name == str(spec["name"]),
+                )
+            )
+        ).scalar_one_or_none()
+        if cls is None:
+            cls = Class(
+                school_id=school.id,
+                teacher_id=teacher.id,
+                name=str(spec["name"]),
+                subject=str(spec["subject"]),
+                period=str(spec["period"]),
+                room=str(spec["room"]),
+            )
+            db.add(cls)
+            await db.flush()
+        classes.append(cls)
+
+        session = (
+            await db.execute(
+                select(ClassSession).where(
+                    ClassSession.class_id == cls.id,
+                    ClassSession.date == today,
+                )
+            )
+        ).scalar_one_or_none()
+        if session is None:
+            db.add(
+                ClassSession(
+                    class_id=cls.id,
+                    date=today,
+                    scheduled_start=spec["start"],
+                    scheduled_end=spec["end"],
+                )
+            )
+
+        for student in students:
+            enrollment = (
+                await db.execute(
+                    select(ClassEnrollment).where(
+                        ClassEnrollment.class_id == cls.id,
+                        ClassEnrollment.student_id == student.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if enrollment is None:
+                db.add(
+                    ClassEnrollment(
+                        class_id=cls.id,
+                        student_id=student.id,
+                        enrolled_at=today - timedelta(days=60),
+                    )
+                )
 
     await db.flush()
     await db.commit()
     logger.info(
-        "seed: created school=%s teacher=%s classes=%d students=%d",
+        "seed: ensured school=%s teacher=%s classes=%d students=%d sessions_date=%s",
         school.id,
         teacher.id,
-        len(DEMO_CLASSES),
+        len(classes),
         len(students),
+        today.isoformat(),
     )
     return {"school_id": school.id, "teacher_id": teacher.id}
 
