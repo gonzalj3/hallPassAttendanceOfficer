@@ -14,9 +14,12 @@ import {
   type OutOfClassEntry,
 } from '../data/mockAdmin';
 import { useDashboardData } from '../hooks/useDashboardData';
-import type { VoiceCallSummaryApi } from '../api/types';
+import type {
+  AlertSummaryApi,
+  TranscriptTurnApi,
+  VoiceCallSummaryApi,
+} from '../api/types';
 import { getVoiceCall } from '../api/client';
-import type { TranscriptTurnApi } from '../api/types';
 
 type DateRange = 'today' | 'week' | 'month';
 
@@ -185,9 +188,11 @@ export default function AdminDashboard() {
           />
         )}
         {section === 'attendance' && <AttendancePage classRosters={data.classRosters} />}
+        {section === 'alerts' && (
+          <AlertsPage alerts={data.alerts} voiceCalls={data.voiceCalls} />
+        )}
         {(section === 'students' ||
           section === 'classrooms' ||
-          section === 'alerts' ||
           section === 'reports' ||
           section === 'settings') && <ComingSoon section={section} />}
       </main>
@@ -1286,6 +1291,323 @@ function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+
+// ---------- AlertsPage: scrollable feed for the principal ----------
+
+function severityChip(severity: AlertSummaryApi['severity']) {
+  const palette: Record<AlertSummaryApi['severity'], { bg: string; fg: string }> = {
+    low: { bg: '#eff5f5', fg: '#3d494a' },
+    medium: { bg: '#fef3e2', fg: '#b27800' },
+    high: { bg: '#fde8e7', fg: '#ba1a1a' },
+    critical: { bg: '#ba1a1a', fg: '#ffffff' },
+  };
+  const c = palette[severity];
+  return (
+    <span
+      className="text-[10px] uppercase tracking-wide font-bold px-1.5 py-0.5 rounded"
+      style={{ backgroundColor: c.bg, color: c.fg }}
+    >
+      {severity}
+    </span>
+  );
+}
+
+function statusChip(status: AlertSummaryApi['status']) {
+  const palette: Record<AlertSummaryApi['status'], { bg: string; fg: string }> = {
+    OPEN: { bg: '#fde8e7', fg: '#ba1a1a' },
+    ACKNOWLEDGED: { bg: '#fef3e2', fg: '#b27800' },
+    RESOLVED: { bg: '#dff5f6', fg: '#00666e' },
+  };
+  const c = palette[status];
+  return (
+    <span
+      className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded"
+      style={{ backgroundColor: c.bg, color: c.fg }}
+    >
+      {status}
+    </span>
+  );
+}
+
+function relativeTime(iso: string, now: number): string {
+  const diff = now - new Date(iso).getTime();
+  if (diff < 0) return 'just now';
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function summarizeContext(context: Record<string, unknown>): string | null {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(context)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === 'object') continue;
+    parts.push(`${k}: ${String(v)}`);
+  }
+  return parts.length === 0 ? null : parts.slice(0, 3).join(' · ');
+}
+
+function AlertsPage({
+  alerts,
+  voiceCalls,
+}: {
+  alerts: AlertSummaryApi[];
+  voiceCalls: VoiceCallSummaryApi[];
+}) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const [statusFilter, setStatusFilter] = useState<'all' | AlertSummaryApi['status']>(
+    'all',
+  );
+  const [expandedCallId, setExpandedCallId] = useState<string | null>(null);
+  const [transcriptCache, setTranscriptCache] = useState<Record<string, TranscriptTurnApi[]>>(
+    {},
+  );
+  const [transcriptLoading, setTranscriptLoading] = useState<string | null>(null);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+
+  const filteredAlerts = useMemo(() => {
+    if (statusFilter === 'all') return alerts;
+    return alerts.filter((a) => a.status === statusFilter);
+  }, [alerts, statusFilter]);
+
+  const openCount = useMemo(() => alerts.filter((a) => a.status === 'OPEN').length, [alerts]);
+  const ackCount = useMemo(
+    () => alerts.filter((a) => a.status === 'ACKNOWLEDGED').length,
+    [alerts],
+  );
+  const todayCalls = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const t = start.getTime();
+    return voiceCalls.filter((c) => new Date(c.callEndedAt).getTime() >= t).length;
+  }, [voiceCalls]);
+
+  const toggleCall = async (id: string) => {
+    if (expandedCallId === id) {
+      setExpandedCallId(null);
+      return;
+    }
+    setExpandedCallId(id);
+    setTranscriptError(null);
+    if (!transcriptCache[id]) {
+      setTranscriptLoading(id);
+      try {
+        const detail = await getVoiceCall(id);
+        setTranscriptCache((prev) => ({ ...prev, [id]: detail.transcript ?? [] }));
+      } catch (e: unknown) {
+        setTranscriptError((e as Error).message);
+      } finally {
+        setTranscriptLoading(null);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <div className="bg-white border border-[#eff5f5] rounded-xl p-5 mb-5 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h2 className="font-['Lexend',sans-serif] text-xl font-bold mb-1">
+              🚨 Alerts &amp; Conversations
+            </h2>
+            <p className="text-sm text-[#3d494a]">
+              Live feed of every threshold breach the rule engine raised, plus every parent
+              call the attendance agent has wrapped up. Updates within seconds via WebSocket.
+            </p>
+          </div>
+          <div className="flex gap-3 text-sm">
+            <div className="bg-[#fde8e7] rounded-lg px-4 py-2">
+              <div className="text-[10px] uppercase text-[#ba1a1a] font-semibold">Open</div>
+              <div className="font-['Lexend',sans-serif] font-bold text-2xl text-[#ba1a1a]">
+                {openCount}
+              </div>
+            </div>
+            <div className="bg-[#fef3e2] rounded-lg px-4 py-2">
+              <div className="text-[10px] uppercase text-[#b27800] font-semibold">
+                Acknowledged
+              </div>
+              <div className="font-['Lexend',sans-serif] font-bold text-2xl text-[#b27800]">
+                {ackCount}
+              </div>
+            </div>
+            <div className="bg-[#dff5f6] rounded-lg px-4 py-2">
+              <div className="text-[10px] uppercase text-[#00666e] font-semibold">
+                Calls today
+              </div>
+              <div className="font-['Lexend',sans-serif] font-bold text-2xl text-[#00666e]">
+                {todayCalls}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-5">
+        {/* Active Alerts column */}
+        <section className="col-span-12 lg:col-span-6 bg-white border border-[#eff5f5] rounded-xl shadow-sm flex flex-col max-h-[calc(100vh-220px)]">
+          <div className="p-4 border-b border-[#eff5f5] flex items-center justify-between">
+            <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
+              🔔 Alerts
+            </h3>
+            <div className="flex gap-1">
+              {(['all', 'OPEN', 'ACKNOWLEDGED', 'RESOLVED'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`text-[10px] uppercase tracking-wide font-semibold px-2 py-1 rounded transition-colors ${
+                    statusFilter === s
+                      ? 'bg-[#171d1e] text-white'
+                      : 'bg-[#eff5f5] text-[#3d494a] hover:bg-[#dde7e8]'
+                  }`}
+                >
+                  {s === 'all' ? 'All' : s}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {filteredAlerts.length === 0 ? (
+              <p className="p-6 text-sm text-[#6d797b] text-center">
+                {statusFilter === 'all'
+                  ? 'No alerts yet. The rule engine will populate this as thresholds breach.'
+                  : `No ${statusFilter.toLowerCase()} alerts.`}
+              </p>
+            ) : (
+              <ul className="divide-y divide-[#eff5f5]">
+                {filteredAlerts.map((a) => {
+                  const ctx = summarizeContext(a.context);
+                  return (
+                    <li key={a.id} className="p-4 hover:bg-[#f7f9f9] transition-colors">
+                      <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                        {severityChip(a.severity)}
+                        {statusChip(a.status)}
+                        <span className="text-xs text-[#6d797b] ml-auto">
+                          {relativeTime(a.createdAt, now)}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold mb-0.5">{a.studentName}</p>
+                      <p className="text-xs text-[#3d494a] mb-1">
+                        <code className="bg-[#eff5f5] px-1 py-0.5 rounded text-[11px]">
+                          {a.ruleKey}
+                        </code>
+                      </p>
+                      {ctx && <p className="text-xs text-[#6d797b]">{ctx}</p>}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Voice Calls column */}
+        <section className="col-span-12 lg:col-span-6 bg-white border border-[#eff5f5] rounded-xl shadow-sm flex flex-col max-h-[calc(100vh-220px)]">
+          <div className="p-4 border-b border-[#eff5f5] flex items-center justify-between">
+            <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
+              📞 Guardian Conversations
+            </h3>
+            <span className="text-xs text-[#6d797b]">
+              {voiceCalls.length} total · click any row for transcript
+            </span>
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {voiceCalls.length === 0 ? (
+              <p className="p-6 text-sm text-[#6d797b] text-center">
+                No conversations yet. The attendance officer agent will report each finished
+                parent call here.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[#eff5f5]">
+                {voiceCalls.map((c) => {
+                  const open = expandedCallId === c.id;
+                  const turns = transcriptCache[c.id];
+                  return (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => void toggleCall(c.id)}
+                        className="w-full text-left p-4 hover:bg-[#f7f9f9] transition-colors"
+                      >
+                        <div className="flex items-baseline gap-2 mb-1 flex-wrap">
+                          <span className="text-[10px] uppercase tracking-wide bg-[#eff5f5] text-[#3d494a] px-1.5 py-0.5 rounded font-semibold">
+                            {c.scenario}
+                          </span>
+                          {c.parentConfirmed === true && (
+                            <span className="text-[10px] uppercase tracking-wide bg-[#dff5f6] text-[#00666e] px-1.5 py-0.5 rounded font-semibold">
+                              confirmed
+                            </span>
+                          )}
+                          {c.alertId && (
+                            <span className="text-[10px] uppercase tracking-wide bg-[#fef3e2] text-[#b27800] px-1.5 py-0.5 rounded font-semibold">
+                              alert-driven
+                            </span>
+                          )}
+                          <span className="text-xs text-[#6d797b] ml-auto">
+                            {relativeTime(c.callEndedAt, now)}
+                            {c.language && ` · ${c.language}`}
+                          </span>
+                          <span className="text-xs text-[#6d797b] ml-1 select-none">
+                            {open ? '▾' : '▸'}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold mb-0.5">{c.studentName}</p>
+                        {c.excuseSummary && (
+                          <p className="text-xs text-[#3d494a]">{c.excuseSummary}</p>
+                        )}
+                      </button>
+                      {open && (
+                        <div className="px-4 pb-4 ml-2 pl-3 border-l-2 border-[#eff5f5]">
+                          {transcriptLoading === c.id ? (
+                            <p className="text-xs text-[#6d797b] py-2">Loading transcript…</p>
+                          ) : transcriptError ? (
+                            <p className="text-xs text-[#ba1a1a] py-2">
+                              Failed to load transcript: {transcriptError}
+                            </p>
+                          ) : !turns || turns.length === 0 ? (
+                            <p className="text-xs text-[#6d797b] py-2">
+                              No transcript was persisted for this call.
+                            </p>
+                          ) : (
+                            <ul className="space-y-1.5 py-2">
+                              {turns.map((t, i) => (
+                                <li key={i} className="text-sm leading-relaxed">
+                                  <span
+                                    className={`inline-block min-w-[70px] mr-2 text-[10px] uppercase font-bold tracking-wide ${
+                                      t.speaker === 'agent'
+                                        ? 'text-[#00666e]'
+                                        : 'text-[#3d494a]'
+                                    }`}
+                                  >
+                                    {t.speaker}
+                                  </span>
+                                  <span className="text-[#171d1e]">{t.text}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
