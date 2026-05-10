@@ -531,3 +531,35 @@ async def test_list_alerts_status_filter(
     assert {r["studentId"] for r in open_only.json()} == {str(s_b)}
     assert ack_only.status_code == 200
     assert {r["studentId"] for r in ack_only.json()} == {str(s_a)}
+
+
+# ---------- student lookup ----------
+
+
+async def test_lookup_student_returns_uuid_for_known_name(
+    client: httpx.AsyncClient, async_session: AsyncSession
+) -> None:
+    seeded = await _seed_school(async_session)
+    expected = seeded["students"][0]  # type: ignore[index]
+
+    response = await client.get(
+        "/api/students/lookup",
+        params={"first_name": "Alice", "last_name": "Garcia"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(expected.id)
+    assert body["name"] == "Alice Garcia"
+    assert body["studentNumber"] == "S001"
+
+
+async def test_lookup_student_404_when_not_found(
+    client: httpx.AsyncClient, async_session: AsyncSession
+) -> None:
+    await _seed_school(async_session)
+    response = await client.get(
+        "/api/students/lookup",
+        params={"first_name": "Nobody", "last_name": "Here"},
+    )
+    assert response.status_code == 404

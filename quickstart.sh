@@ -34,7 +34,15 @@ SAFETY_IDENTIFIER="${SAFETY_IDENTIFIER:-outbound-voice-agent-local}"
 # to the backend port we just decided on. WS URL is auto-derived in
 # frontend/src/api/realtime.ts (http -> ws), so it doesn't need to be set.
 VITE_API_URL="${VITE_API_URL:-http://localhost:${BACKEND_PORT}}"
-export DATABASE_URL PORT FRONTEND_PORT SAFETY_IDENTIFIER VITE_API_URL
+# BACKEND_URL + BACKEND_HMAC_SECRET let the voice agent POST finished
+# calls to the ABE backend (signed). Backend reads PARENT_COMMS_SECRET
+# as its HMAC secret for the agent boundary; voice-agent reuses it so
+# everyone agrees without a second knob to set.
+BACKEND_URL="${BACKEND_URL:-http://localhost:${BACKEND_PORT}}"
+BACKEND_HMAC_SECRET="${BACKEND_HMAC_SECRET:-${PARENT_COMMS_SECRET:-demo-shared-secret}}"
+PARENT_COMMS_SECRET="${PARENT_COMMS_SECRET:-${BACKEND_HMAC_SECRET}}"
+export DATABASE_URL PORT FRONTEND_PORT SAFETY_IDENTIFIER VITE_API_URL \
+  BACKEND_URL BACKEND_HMAC_SECRET PARENT_COMMS_SECRET
 
 if [[ -z "$OPENAI_API_KEY_VALUE" || "$OPENAI_API_KEY_VALUE" == "sk-your-api-key" ]]; then
   cat <<MSG

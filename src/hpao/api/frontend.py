@@ -302,6 +302,49 @@ async def list_hall_passes(
     return [await _hall_pass_to_out(db, hp) for hp in rows]
 
 
+# ---------- student lookup (used by the voice agent for CSV->UUID mapping) ----------
+
+
+@router.get(
+    "/students/lookup",
+    response_model=StudentOut,
+    response_model_by_alias=True,
+)
+async def lookup_student(
+    db: SessionDep,
+    first_name: str,
+    last_name: str,
+) -> StudentOut:
+    """Resolve `first_name` + `last_name` to the backend's student record.
+
+    Useful for callers (the voice agent, ad-hoc CLIs) that hold a name
+    rather than a UUID. Single-school hackathon assumption: the (first,
+    last) pair is unique. Returns 404 if no match, 409 if multiple.
+    """
+    rows = list(
+        (
+            await db.execute(
+                select(Student).where(
+                    Student.first_name == first_name, Student.last_name == last_name
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"student {first_name} {last_name} not found",
+        )
+    if len(rows) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"multiple students named {first_name} {last_name} — disambiguate with student_number",
+        )
+    return _student_to_out(rows[0])
+
+
 # ---------- voice-call dashboard reads ----------
 
 

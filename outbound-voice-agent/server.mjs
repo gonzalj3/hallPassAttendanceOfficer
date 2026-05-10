@@ -1,3 +1,4 @@
+import { createHmac, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -8,6 +9,12 @@ import { loadAttendanceCase } from "./src/attendance-data.mjs";
 import { appendConversationRows } from "./src/conversation-log.mjs";
 import { appendExcuseRecord } from "./src/excuse-log.mjs";
 import { buildSessionConfig } from "./src/session-config.mjs";
+
+// In-memory transcript + start-time per call_id so /attendance-excuse
+// can ship the full conversation to the backend after the call ends.
+// Cleared on successful POST. Maps don't grow unbounded for the demo
+// (one active call at a time) — revisit if we ever multiplex.
+const callMeta = new Map();
 
 function loadEnvFile() {
   const envPath = new URL("./.env", import.meta.url).pathname;
@@ -127,6 +134,21 @@ async function handleConversationLog(req, res) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const rowsWritten = await appendConversationRows(caseData, messages);
 
+  // Cache transcript turns for the /attendance-excuse handler to ship
+  // alongside the excuse summary.
+  const meta = callMeta.get(caseData.call_id) ?? {
+    startedAt: new Date().toISOString(),
+    transcript: []
+  };
+  for (const m of messages) {
+    meta.transcript.push({
+      speaker: m.speaker,
+      text: m.transcript ?? m.text ?? "",
+      occurred_at: m.timestamp ?? m.ts ?? null
+    });
+  }
+  callMeta.set(caseData.call_id, meta);
+
   sendJson(res, 200, {
     ok: true,
     rows_written: rowsWritten
@@ -139,7 +161,108 @@ async function handleAttendanceExcuse(req, res) {
   const caseData = body.caseData ?? (await loadAttendanceCase());
   const result = await appendExcuseRecord(caseData, body.excuse ?? {});
 
+  // Mirror the conversation to the ABE backend so the admin dashboard
+  // sees it live. Best-effort: any failure (no backend, no creds, lookup
+  // miss, signature mismatch) logs and lets the CSV-only path stand.
+  try {
+    await postCallToBackend(caseData, body.excuse ?? {});
+  } catch (e) {
+    console.warn(`[voice-agent] backend POST failed: ${e?.message ?? e}`);
+  }
+  callMeta.delete(caseData.call_id);
+
   sendJson(res, 200, result);
+}
+
+function signBody(secret, body) {
+  return createHmac("sha256", secret).update(body).digest("hex");
+}
+
+function inferScenarioFromCase(caseData) {
+  // The call_id template is `${student_id}-${absent_date}` for absentee
+  // calls; hall-pass scenarios get a HP- prefix on the case CSV. Default
+  // to absentee — the backend accepts "other" as a fallback if needed.
+  if (typeof caseData?.call_id === "string" && caseData.call_id.startsWith("HP-")) {
+    return "hall_pass";
+  }
+  return "absentee";
+}
+
+async function resolveStudentUuid(backendUrl, caseData) {
+  const fullName = String(caseData?.student_name ?? "").trim();
+  if (!fullName) return null;
+  const parts = fullName.split(/\s+/);
+  if (parts.length < 2) return null;
+  const firstName = parts[0];
+  const lastName = parts.slice(1).join(" ");
+  const url = `${backendUrl}/api/students/lookup?first_name=${encodeURIComponent(firstName)}&last_name=${encodeURIComponent(lastName)}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    console.warn(`[voice-agent] student lookup ${response.status} for ${fullName}`);
+    return null;
+  }
+  const body = await response.json();
+  return body?.id ?? null;
+}
+
+async function postCallToBackend(caseData, excuse) {
+  const backendUrl = process.env.BACKEND_URL;
+  const secret = process.env.BACKEND_HMAC_SECRET;
+  if (!backendUrl || !secret) {
+    // Voice agent runs standalone in CSV-only mode by default. Set both
+    // env vars (quickstart.sh does so when the backend is up) to enable.
+    return;
+  }
+
+  const studentId = await resolveStudentUuid(backendUrl, caseData);
+  if (!studentId) return;
+
+  const meta = callMeta.get(caseData.call_id) ?? {
+    startedAt: new Date().toISOString(),
+    transcript: []
+  };
+
+  const parentConfirmedRaw = excuse?.parent_confirmed;
+  const parentConfirmed =
+    parentConfirmedRaw === undefined || parentConfirmedRaw === null
+      ? null
+      : String(parentConfirmedRaw).toLowerCase() === "true" ||
+        parentConfirmedRaw === true;
+
+  const payload = {
+    correlation_id: randomUUID(),
+    student_id: studentId,
+    alert_id: null,
+    scenario: inferScenarioFromCase(caseData),
+    call_started_at: meta.startedAt,
+    call_ended_at: new Date().toISOString(),
+    transcript: meta.transcript,
+    excuse_summary: excuse?.stated_reason ?? excuse?.transcript_summary ?? null,
+    parent_confirmed: parentConfirmed,
+    language: excuse?.language ?? caseData?.guardian_language ?? null,
+    metadata: {
+      call_id: caseData?.call_id ?? null,
+      excuse_record_id: excuse?.excuse_record_id ?? null
+    }
+  };
+
+  const body = JSON.stringify(payload);
+  const sig = signBody(secret, body);
+  const response = await fetch(`${backendUrl}/v1/agent/inbound/voice-call`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-HPAO-Signature": sig
+    },
+    body
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`backend ${response.status}: ${text.slice(0, 200)}`);
+  }
+  console.log(
+    `[voice-agent] POST /v1/agent/inbound/voice-call ok (correlation_id=${payload.correlation_id})`
+  );
 }
 
 async function serveStatic(req, res) {
