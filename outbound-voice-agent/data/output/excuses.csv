@@ -1,1 +1,2 @@
 timestamp,excuse_record_id,call_id,student_id,student_name,parent_name,guardian_language,absent_date,absence_dates,stated_reason,parent_confirmed,language,transcript_summary,status
+2026-05-10T00:49:05.178Z,EXC-STU-1001-2026-05-09-1778374145178,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,Spanish,2026-05-09,,Avery was at the doctor and is sick.,true,English,Guardian confirmed Avery was absent due to a doctor visit and current illness.,pending_review

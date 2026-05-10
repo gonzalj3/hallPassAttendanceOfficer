@@ -1,4 +1,5 @@
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,21 +18,36 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _normalize_database_url(cls, v: str) -> str:
-        """Coerce bare ``postgres://`` and ``postgresql://`` URLs into the
-        ``postgresql+asyncpg://`` form SQLAlchemy 2.0 + asyncpg expects.
+        """Coerce ``postgres://...?sslmode=...`` URLs into the
+        ``postgresql+asyncpg://...`` form SQLAlchemy 2.0 + asyncpg accepts.
 
-        ``fly postgres attach`` writes a bare ``postgres://`` URL into
-        ``DATABASE_URL``; without this the app would crash on first connect
-        and require a manual ``fly secrets set DATABASE_URL=postgresql+asyncpg://...``.
-        URLs that already specify a driver (``postgresql+asyncpg://``,
-        ``postgresql+psycopg://``, etc.) are passed through unchanged.
+        ``fly postgres attach`` writes ``postgres://...?sslmode=disable`` into
+        ``DATABASE_URL``. Two things break asyncpg there:
+
+        1. The ``postgres://`` scheme — SQLAlchemy 2.0 requires a driver,
+           e.g. ``postgresql+asyncpg``. Bare ``postgresql://`` likewise.
+        2. The ``sslmode`` query param — that's libpq / psycopg syntax;
+           asyncpg uses ``ssl=`` and rejects ``sslmode`` as an unknown
+           kwarg. Fly's ``flycast`` hostname goes over Fly's internal
+           wireguard mesh, so no SSL is needed; just drop the param.
+
+        URLs already in the asyncpg form (or pinned to another explicit
+        driver like ``postgresql+psycopg``) are passed through unchanged.
         """
-        if v.startswith("postgresql+"):
-            return v
-        if v.startswith("postgres://"):
-            return "postgresql+asyncpg://" + v[len("postgres://") :]
-        if v.startswith("postgresql://"):
-            return "postgresql+asyncpg://" + v[len("postgresql://") :]
+        if not v.startswith("postgresql+"):
+            if v.startswith("postgres://"):
+                v = "postgresql+asyncpg://" + v[len("postgres://") :]
+            elif v.startswith("postgresql://"):
+                v = "postgresql+asyncpg://" + v[len("postgresql://") :]
+
+        parsed = urlparse(v)
+        if parsed.query:
+            kept = [
+                (k, val)
+                for k, val in parse_qsl(parsed.query, keep_blank_values=True)
+                if k != "sslmode"
+            ]
+            v = urlunparse(parsed._replace(query=urlencode(kept)))
         return v
 
     # Inter-agent boundary (Phase 8 + dispatcher). When either is unset the

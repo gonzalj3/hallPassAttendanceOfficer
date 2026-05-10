@@ -1,3 +1,14 @@
 timestamp,call_id,student_id,student_name,parent_name,absences_this_year,speaker,transcript
 2026-05-09T17:45:02.540Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"Okay, starting the attendance call now. Let’s get the key details sorted together."
 2026-05-09T17:45:02.540Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"First, please tell me the student’s name, the absence date or dates in year-month-day format, and the parent or guardian’s explanation for the absence. Then I’ll read a brief summary back for their confirmation before submitting it."
+2026-05-10T00:31:43.697Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"Hello this is Ava, your school attendence agent. Is this Morgan Johnson?
+Hola, soy Ava, su agente de asistencia escolar. ¿Es usted Morgan Johnson?"
+2026-05-10T00:48:18.324Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"Hello this is Ava, your school attendence agent. Is this Morgan Johnson?
+Hola, soy Ava, su agente de asistencia escolar. ¿Es usted Morgan Johnson?"
+2026-05-10T00:48:35.344Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,parent,This is Morgan Johnson.
+2026-05-10T00:48:35.344Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"Avery Johnson was absent today and has had 14 hall passes in the last 10 school days for a total of 4 hours absent. Please tell me, is there a valid reason for the absence and hall passes?"
+2026-05-10T00:48:53.613Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,parent,"Yes, he was at the doctor and he's sick right now."
+2026-05-10T00:48:53.613Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,You’re saying Avery was at the doctor and is currently sick. Please confirm that I understood correctly.
+2026-05-10T00:49:05.178Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,parent,"Yes, that's correct."
+2026-05-10T00:49:05.178Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,"Got it, thanks for confirming—let me check that now."
+2026-05-10T00:49:08.139Z,STU-1001-2026-05-09,STU-1001,Avery Johnson,Morgan Johnson,4,assistant,The explanation has been recorded for the attendance office to review.

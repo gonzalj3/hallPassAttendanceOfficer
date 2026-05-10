@@ -42,3 +42,15 @@ def test_settings_passes_through_other_explicit_driver() -> None:
     """Don't second-guess callers who picked a different driver on purpose."""
     s = Settings(database_url="postgresql+psycopg://user:pw@host:5432/db")
     assert s.database_url == "postgresql+psycopg://user:pw@host:5432/db"
+
+
+def test_settings_strips_sslmode_query_param() -> None:
+    """`fly postgres attach` writes ?sslmode=disable; asyncpg rejects it."""
+    s = Settings(database_url="postgres://user:pw@host.flycast:5432/db?sslmode=disable")
+    assert s.database_url == "postgresql+asyncpg://user:pw@host.flycast:5432/db"
+
+
+def test_settings_keeps_other_query_params() -> None:
+    """Don't drop unrelated query params while stripping sslmode."""
+    s = Settings(database_url="postgres://u:p@h:5432/d?sslmode=disable&application_name=hpao")
+    assert s.database_url == "postgresql+asyncpg://u:p@h:5432/d?application_name=hpao"
