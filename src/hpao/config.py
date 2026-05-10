@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +13,26 @@ class Settings(BaseSettings):
 
     database_url: str = Field(...)
     app_env: str = Field(default="dev")
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, v: str) -> str:
+        """Coerce bare ``postgres://`` and ``postgresql://`` URLs into the
+        ``postgresql+asyncpg://`` form SQLAlchemy 2.0 + asyncpg expects.
+
+        ``fly postgres attach`` writes a bare ``postgres://`` URL into
+        ``DATABASE_URL``; without this the app would crash on first connect
+        and require a manual ``fly secrets set DATABASE_URL=postgresql+asyncpg://...``.
+        URLs that already specify a driver (``postgresql+asyncpg://``,
+        ``postgresql+psycopg://``, etc.) are passed through unchanged.
+        """
+        if v.startswith("postgresql+"):
+            return v
+        if v.startswith("postgres://"):
+            return "postgresql+asyncpg://" + v[len("postgres://") :]
+        if v.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + v[len("postgresql://") :]
+        return v
 
     # Inter-agent boundary (Phase 8 + dispatcher). When either is unset the
     # dispatcher still runs detect_overdue_passes for state hygiene but skips

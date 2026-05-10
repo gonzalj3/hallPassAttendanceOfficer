@@ -20,3 +20,25 @@ def test_settings_loads_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_settings_app_env_defaults_to_dev() -> None:
     s = Settings(database_url="postgresql+asyncpg://x/y")
     assert s.app_env == "dev"
+
+
+def test_settings_normalizes_bare_postgres_url() -> None:
+    """`fly postgres attach` writes `postgres://` — coerce to asyncpg form."""
+    s = Settings(database_url="postgres://user:pw@host:5432/db")
+    assert s.database_url == "postgresql+asyncpg://user:pw@host:5432/db"
+
+
+def test_settings_normalizes_postgresql_without_driver() -> None:
+    s = Settings(database_url="postgresql://user:pw@host:5432/db")
+    assert s.database_url == "postgresql+asyncpg://user:pw@host:5432/db"
+
+
+def test_settings_passes_through_explicit_driver() -> None:
+    s = Settings(database_url="postgresql+asyncpg://user:pw@host:5432/db")
+    assert s.database_url == "postgresql+asyncpg://user:pw@host:5432/db"
+
+
+def test_settings_passes_through_other_explicit_driver() -> None:
+    """Don't second-guess callers who picked a different driver on purpose."""
+    s = Settings(database_url="postgresql+psycopg://user:pw@host:5432/db")
+    assert s.database_url == "postgresql+psycopg://user:pw@host:5432/db"
