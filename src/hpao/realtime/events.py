@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 Severity = Literal["low", "medium", "high", "critical"]
 AttendanceStatus = Literal["PRESENT", "ABSENT", "TARDY", "EXCUSED", "UNEXCUSED"]
 Destination = Literal["RESTROOM", "NURSE", "COUNSELOR", "OFFICE", "OTHER", "HALLWAY", "CLASSROOM"]
+VoiceCallScenario = Literal["absentee", "hall_pass", "other"]
 
 
 class _EventBase(BaseModel):
@@ -62,8 +63,30 @@ class AlertRaised(_EventBase):
     evidence: dict[str, Any] = Field(default_factory=dict)
 
 
+class VoiceCallCompleted(_EventBase):
+    """Outbound voice agent finished a parent call. Carries enough metadata
+    for an admin dashboard to render a card (who/when/why) without fetching
+    the full transcript — that's behind the agent_messages.payload JSONB."""
+
+    event: Literal["voice_call.completed"] = "voice_call.completed"
+    agent_message_id: UUID
+    correlation_id: UUID
+    alert_id: UUID | None = None
+    scenario: VoiceCallScenario
+    call_started_at: datetime
+    call_ended_at: datetime
+    parent_confirmed: bool | None = None
+    excuse_summary: str | None = None
+    language: str | None = None
+
+
 RealtimeEvent = Annotated[
-    AttendanceRecorded | HallpassIssued | HallpassReturned | HallpassOverdue | AlertRaised,
+    AttendanceRecorded
+    | HallpassIssued
+    | HallpassReturned
+    | HallpassOverdue
+    | AlertRaised
+    | VoiceCallCompleted,
     Field(discriminator="event"),
 ]
 

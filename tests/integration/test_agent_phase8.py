@@ -418,3 +418,85 @@ async def test_dispatch_alert_records_outbound_log_row(
     assert fetched.payload["event"] == "alert.raised"
     assert fetched.alert_id == alert.id
     assert fetched.sent_at is not None
+
+
+# ---------- inbound: voice-call ----------
+
+
+def _voice_call_payload(student_id: str, alert_id: str | None = None) -> dict[str, object]:
+    started = datetime.now(UTC)
+    body: dict[str, object] = {
+        "correlation_id": str(uuid4()),
+        "student_id": student_id,
+        "alert_id": alert_id,
+        "scenario": "absentee",
+        "call_started_at": started.isoformat(),
+        "call_ended_at": started.isoformat(),
+        "transcript": [
+            {
+                "speaker": "agent",
+                "text": "Hi, this is the school calling.",
+                "occurred_at": started.isoformat(),
+            },
+            {"speaker": "guardian", "text": "Hello, yes — Marcus is sick today."},
+        ],
+        "excuse_summary": "Doctor appointment, returning Wednesday.",
+        "parent_confirmed": True,
+        "language": "en",
+        "metadata": {"call_id": "EXC-1"},
+    }
+    return body
+
+
+async def test_inbound_voice_call_accepts_signed_payload(
+    client: AsyncClient, async_session: AsyncSession
+) -> None:
+    _teacher, student, _cs = await _scaffold(async_session)
+    payload = _voice_call_payload(str(student.id))
+    resp = await _signed_post(client, "/v1/agent/inbound/voice-call", payload)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["accepted"] is True
+    assert body["duplicate"] is False
+
+
+async def test_inbound_voice_call_rejects_unsigned(
+    client: AsyncClient, async_session: AsyncSession
+) -> None:
+    _teacher, student, _cs = await _scaffold(async_session)
+    payload = _voice_call_payload(str(student.id))
+    resp = await client.post("/v1/agent/inbound/voice-call", json=payload)
+    assert resp.status_code == 401
+
+
+async def test_inbound_voice_call_idempotent_on_correlation_id(
+    client: AsyncClient, async_session: AsyncSession
+) -> None:
+    _teacher, student, _cs = await _scaffold(async_session)
+    payload = _voice_call_payload(str(student.id))
+    first = await _signed_post(client, "/v1/agent/inbound/voice-call", payload)
+    second = await _signed_post(client, "/v1/agent/inbound/voice-call", payload)
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["agent_message_id"] == second.json()["agent_message_id"]
+    assert second.json()["duplicate"] is True
+
+
+async def test_inbound_voice_call_persists_with_voice_agent_counterparty(
+    client: AsyncClient, async_session: AsyncSession
+) -> None:
+    _teacher, student, _cs = await _scaffold(async_session)
+    payload = _voice_call_payload(str(student.id))
+    resp = await _signed_post(client, "/v1/agent/inbound/voice-call", payload)
+    msg_id = resp.json()["agent_message_id"]
+
+    fetched = (
+        await async_session.execute(select(AgentMessage).where(AgentMessage.id == msg_id))
+    ).scalar_one()
+    assert fetched.counterparty == "voice_agent"
+    assert fetched.direction == "INBOUND"
+    assert fetched.student_id == student.id
+    assert fetched.payload["scenario"] == "absentee"
+    assert fetched.payload["excuse_summary"] == "Doctor appointment, returning Wednesday."
+    assert fetched.payload["parent_confirmed"] is True
+    assert len(fetched.payload["transcript"]) == 2

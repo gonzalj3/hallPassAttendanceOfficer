@@ -18,6 +18,8 @@ from hpao.realtime.events import (
     HallpassReturned,
     RealtimeEvent,
     Severity,
+    VoiceCallCompleted,
+    VoiceCallScenario,
     channels_for,
 )
 from hpao.realtime.postgres import (
@@ -42,6 +44,8 @@ __all__ = [
     "RealtimeListener",
     "RealtimePublisher",
     "Severity",
+    "VoiceCallCompleted",
+    "VoiceCallScenario",
     "asyncpg_dsn",
     "channels_for",
     "make_app",

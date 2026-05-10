@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from typing import Annotated, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, status
 from sqlalchemy import func, select
@@ -29,6 +29,8 @@ from hpao.models import (
     HallPass,
     Student,
 )
+from hpao.realtime.events import VoiceCallCompleted
+from hpao.realtime.postgres import PgNotifyPublisher
 from hpao.schemas.agent import (
     ActiveHallPassOut,
     AttendanceSummary,
@@ -37,6 +39,7 @@ from hpao.schemas.agent import (
     ParentMessageIn,
     ParentResponseIn,
     StudentContextOut,
+    VoiceCallIn,
 )
 from hpao.services.agent_messages import log_inbound
 
@@ -48,6 +51,7 @@ SessionProvider = Callable[[], Awaitable[AsyncSession]]
 
 
 COUNTERPARTY = "parent_comms"
+COUNTERPARTY_VOICE_AGENT = "voice_agent"
 
 
 # ---------- dependency factories ----------
@@ -145,6 +149,68 @@ async def inbound_parent_response(
         payload=payload.model_dump(mode="json"),
         student_id=payload.student_id,
     )
+    return InboundAck(
+        accepted=True,
+        agent_message_id=msg.id,
+        correlation_id=payload.correlation_id,
+        duplicate=duplicate,
+    )
+
+
+@router.post(
+    "/inbound/voice-call",
+    response_model=InboundAck,
+    status_code=status.HTTP_200_OK,
+)
+async def inbound_voice_call(
+    payload: VoiceCallIn,
+    _verified: VerifiedBodyDep,
+    db: SessionDep,
+) -> InboundAck:
+    """The outbound voice agent finished a parent call.
+
+    Persists the full record (transcript + metadata) into agent_messages
+    under counterparty=voice_agent and publishes voice_call.completed over
+    realtime so admin dashboards can surface the conversation immediately.
+    Idempotent on `correlation_id`.
+    """
+    msg, duplicate = await log_inbound(
+        db,
+        counterparty=COUNTERPARTY_VOICE_AGENT,
+        correlation_id=payload.correlation_id,
+        payload=payload.model_dump(mode="json"),
+        student_id=payload.student_id,
+        alert_id=payload.alert_id,
+    )
+
+    if not duplicate:
+        student = await db.get(Student, payload.student_id)
+        if student is None:
+            # FK on agent_messages.student_id would have rejected the insert,
+            # so this is unreachable in practice. Defensive in case future
+            # callers nullify the FK.
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"student {payload.student_id} not found",
+            )
+        event = VoiceCallCompleted(
+            event_id=uuid4(),
+            occurred_at=datetime.now(tz=payload.call_ended_at.tzinfo),
+            school_id=student.school_id,
+            student_id=payload.student_id,
+            agent_message_id=msg.id,
+            correlation_id=payload.correlation_id,
+            alert_id=payload.alert_id,
+            scenario=payload.scenario,
+            call_started_at=payload.call_started_at,
+            call_ended_at=payload.call_ended_at,
+            parent_confirmed=payload.parent_confirmed,
+            excuse_summary=payload.excuse_summary,
+            language=payload.language,
+        )
+        conn = await db.connection()
+        await PgNotifyPublisher(conn).publish(event)
+
     return InboundAck(
         accepted=True,
         agent_message_id=msg.id,

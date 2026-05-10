@@ -161,3 +161,49 @@ class StudentContextRequest(_Base):
     """Optional `since` date filter on the attendance summary."""
 
     since: date | None = None
+
+
+# ---------- inbound: outbound-voice-agent -> HPAO ----------
+
+
+class TranscriptTurn(_Base):
+    """One turn from a voice agent transcript."""
+
+    speaker: str = Field(description="agent | guardian | system")
+    text: str
+    occurred_at: datetime | None = None
+
+
+class VoiceCallIn(_Base):
+    """The outbound voice agent reports a finished parent call.
+
+    Idempotent on `correlation_id`. The endpoint persists the full record
+    into agent_messages (counterparty=voice_agent, direction=INBOUND) and
+    publishes a voice_call.completed realtime event so admin dashboards
+    can surface the conversation immediately.
+    """
+
+    correlation_id: UUID
+    student_id: UUID
+    alert_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Alert that triggered the call, when known. Lets admins jump from "
+            "a transcript card straight to the underlying threshold breach."
+        ),
+    )
+    scenario: str = Field(description="absentee | hall_pass | other")
+    call_started_at: datetime
+    call_ended_at: datetime
+    transcript: list[TranscriptTurn] = Field(default_factory=list)
+    excuse_summary: str | None = Field(
+        default=None,
+        description=(
+            "Short summary of the guardian's stated reason, e.g. 'Doctor "
+            "appointment, returning Wednesday'. Voice agent fills this in "
+            "after the conversation; null when no excuse was captured."
+        ),
+    )
+    parent_confirmed: bool | None = None
+    language: str | None = Field(default=None, description="BCP-47 / ISO 639-1, e.g. 'en' or 'es'.")
+    metadata: dict[str, Any] = Field(default_factory=dict)
