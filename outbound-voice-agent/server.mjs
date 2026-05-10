@@ -208,9 +208,12 @@ async function resolveStudentUuid(backendUrl, caseData) {
 async function postCallToBackend(caseData, excuse) {
   const backendUrl = process.env.BACKEND_URL;
   const secret = process.env.BACKEND_HMAC_SECRET;
-  if (!backendUrl || !secret) {
-    // Voice agent runs standalone in CSV-only mode by default. Set both
-    // env vars (quickstart.sh does so when the backend is up) to enable.
+  if (!backendUrl) {
+    // Voice agent runs standalone in CSV-only mode by default. Set
+    // BACKEND_URL (quickstart.sh does so when the backend is up) to
+    // enable forwarding completed calls. BACKEND_HMAC_SECRET is
+    // optional -- if set, the request is signed; if not, we POST
+    // unsigned and the backend's hackathon-mode skip lets it through.
     return;
   }
 
@@ -247,13 +250,13 @@ async function postCallToBackend(caseData, excuse) {
   };
 
   const body = JSON.stringify(payload);
-  const sig = signBody(secret, body);
+  const headers = { "Content-Type": "application/json" };
+  if (secret) {
+    headers["X-HPAO-Signature"] = signBody(secret, body);
+  }
   const response = await fetch(`${backendUrl}/v1/agent/inbound/voice-call`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-HPAO-Signature": sig
-    },
+    headers,
     body
   });
   if (!response.ok) {

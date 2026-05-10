@@ -57,12 +57,15 @@ COUNTERPARTY_VOICE_AGENT = "voice_agent"
 # ---------- dependency factories ----------
 
 
-def _get_secret() -> str:
-    """Override in tests via app.dependency_overrides."""
-    raise HTTPException(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="HMAC secret not configured",
-    )
+def _get_secret() -> str | None:
+    """Override in app wiring via app.dependency_overrides.
+
+    Returns None when no shared secret is configured. In that case the
+    agent boundary skips HMAC verification entirely -- intended for
+    hackathon / local-dev use only. Set ``PARENT_COMMS_SECRET`` to
+    re-enable signing.
+    """
+    return None
 
 
 def _get_session() -> AsyncSession:
@@ -73,7 +76,7 @@ def _get_session() -> AsyncSession:
     )
 
 
-SecretDep = Annotated[str, Depends(_get_secret)]
+SecretDep = Annotated[str | None, Depends(_get_secret)]
 SessionDep = Annotated[AsyncSession, Depends(_get_session)]
 
 
@@ -83,8 +86,15 @@ async def _verified_body(request: Request, secret: SecretDep) -> bytes:
     FastAPI consumes the body when it parses a Pydantic model from JSON, so
     we read it here first, verify, then re-inject so the next parser can
     read again. (Standard pattern for HMAC over raw body in FastAPI.)
+
+    When ``secret`` is unset (hackathon mode) verification is skipped --
+    the endpoint becomes publicly callable, so leave the secret set in
+    any environment with real data.
     """
     body = await request.body()
+    if not secret:
+        request._body = body
+        return body
     sig = request.headers.get(SIGNATURE_HEADER)
     if not verify(secret, body, sig):
         raise HTTPException(
@@ -236,12 +246,13 @@ async def student_context(
     empty bytes -- still authenticates the caller via the shared secret.
     """
     body = await request.body()
-    sig = request.headers.get(SIGNATURE_HEADER)
-    if not verify(secret, body, sig):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="invalid HMAC signature",
-        )
+    if secret:
+        sig = request.headers.get(SIGNATURE_HEADER)
+        if not verify(secret, body, sig):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="invalid HMAC signature",
+            )
 
     student = await db.get(Student, student_id)
     if student is None:
