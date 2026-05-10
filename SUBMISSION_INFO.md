@@ -1,12 +1,13 @@
-# ABE Attendance Officer Submission Info
+# Submission Info
 
 ## Project Title
 
-ABE Attendance Officer
+Ava Attendance Officer
 
 ## 1-Sentence Tagline
 
-A multilingual attendance agent that calls guardians, captures valid excuses, and records outcomes back to the school data system.
+A multilingual school attendance agent that closes the loop between classroom attendence, school policy, and guardian communication.
+
 
 ## Track Selected
 
@@ -32,13 +33,15 @@ https://github.com/gonzalj3/hallPassAttendanceOfficer/blob/main/README.md
 
 - Juliana Messineo - iPad App
 - Chrissy McDannell - Teacher Dashboard
-- Jose Gonzalez - Data and Logic
+- Jose Gonzalez - Data, Policy, and Logic
 - Jonathan Malkin - Realtime voice agent
 
 ## Short Write-Up
 
-Schools lose valuable instructional time when attendance follow-up and hall pass concerns are handled manually. Teachers, attendance staff, students, and guardians all need a faster way to identify issues, communicate clearly, and record valid context without adding more administrative overhead.
+School funding is based, in part, on student attendence.  Tracking time outside class is often not tracked properly and has minimal follow-up. The Ava Agent provides a simple way to track time, identify issues, and communicate with student guardians.  
 
-ABE Attendance Officer is an agentic attendance workflow for high schools. Teacher and hall pass surfaces send events into ABE, which combines student data, attendance history, hall pass trends, and policy logic to queue the right next action. The voice agent then calls guardians in English or Spanish, asks for the reason behind an absence or excessive hall pass usage, adapts to the guardian's language, and records the confirmed explanation back into the datastore.
+The prototype connects a teacher dashboard, hall-pass iPad flow, FastAPI/Postgres policy backend, alerts, and an OpenAI Realtime voice agent into one working demo.
 
-The result is a working demo of a school operations agent that closes the loop between data, policy, family communication, and staff follow-up. With production integrations, ABE could help schools reduce missed instructional time, document interventions more consistently, and give attendance teams a clearer picture of which students need support.
+Teacher attendance records and student hall-pass activity flow into a shared backend where Ava maintains the student timeline, evaluates policy thresholds, and raises alerts when intervention is needed. When a student’s attendance or hall-pass pattern needs guardian context, Ava places a bilingual voice call, asks for a reason, summarizes the response, and records the explanation for attendance-office review. 
+
+The result is a practical school operations agent: less manual follow-up, clearer documentation, and faster visibility into which students need support.

@@ -100,7 +100,7 @@ function setMicrophoneListening(enabled) {
     track.enabled = enabled;
   }
 
-  micToggleLabel.textContent = enabled ? "Pause Mic" : "Enable Mic";
+  micToggleLabel.textContent = enabled ? "Release to Send" : "Hold to Talk";
   micToggleButton.setAttribute("aria-pressed", String(enabled));
 }
 
@@ -118,20 +118,39 @@ function setCallButtonStarted(started, scenario = activeScenario) {
   startButton.disabled = started && !absenteeStarted;
 }
 
-function toggleMicrophoneListening() {
+function startPushToTalk(event) {
+  event?.preventDefault();
   if (!mediaStream || isListenOnlySession) return;
 
-  const nextState = !isMicrophoneListening;
-  setMicrophoneListening(nextState);
+  setMicrophoneListening(true);
   setStatus(
-    nextState ? "Mic Listening" : "Mic Paused",
-    nextState ? "The parent microphone is on." : "The parent microphone is muted."
+    "Mic Listening",
+    "Keep holding while the parent speaks. Release when finished."
   );
+}
+
+function stopPushToTalk(event) {
+  event?.preventDefault();
+  if (!mediaStream || isListenOnlySession || !isMicrophoneListening) return;
+
+  setMicrophoneListening(false);
+  setStatus("Mic Paused", "Release captured. Waiting for Ava to respond.");
+}
+
+function handlePushToTalkKeyDown(event) {
+  if (event.key !== " " && event.key !== "Enter") return;
+  if (event.repeat) return;
+  startPushToTalk(event);
+}
+
+function handlePushToTalkKeyUp(event) {
+  if (event.key !== " " && event.key !== "Enter") return;
+  stopPushToTalk(event);
 }
 
 function transcriptLabelFor(label) {
   const labels = {
-    assistant: "ABE",
+    assistant: "Ava",
     parent: "GUARDIAN",
     system: "STATUS",
     error: "ERROR"
@@ -309,7 +328,7 @@ function handleRealtimeEvent(rawEvent) {
   switch (event.type) {
     case "session.created":
       if (!shouldKeepListenOnlyStatus) {
-        setStatus("Connected", "Mic paused. Click Enable Mic when the parent is ready to respond.");
+        setStatus("Connected", "Mic paused. Hold the talk button while the parent speaks.");
       }
       break;
     case "input_audio_buffer.speech_started":
@@ -342,7 +361,7 @@ function handleRealtimeEvent(rawEvent) {
         if (shouldKeepListenOnlyStatus) {
           setStatus("Listen Only", "Opening played. Parent responses need microphone access.");
         } else if (!isMicrophoneListening) {
-          setStatus("Mic Paused", "Click Enable Mic when the parent is ready to respond.");
+          setStatus("Mic Paused", "Hold the talk button while the parent speaks.");
         } else {
           setStatus("Listening", "Ready for the parent response or next call turn.");
         }
@@ -554,7 +573,12 @@ startButton.addEventListener("click", () => {
   handleScenarioButtonClick("absentee");
 });
 
-micToggleButton.addEventListener("click", toggleMicrophoneListening);
+micToggleButton.addEventListener("pointerdown", startPushToTalk);
+micToggleButton.addEventListener("pointerup", stopPushToTalk);
+micToggleButton.addEventListener("pointercancel", stopPushToTalk);
+micToggleButton.addEventListener("pointerleave", stopPushToTalk);
+micToggleButton.addEventListener("keydown", handlePushToTalkKeyDown);
+micToggleButton.addEventListener("keyup", handlePushToTalkKeyUp);
 resetButton.addEventListener("click", async () => {
   try {
     await restartSession();
