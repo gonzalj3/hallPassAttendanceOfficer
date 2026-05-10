@@ -1,0 +1,38 @@
+# Keep the image small and the build context fast.
+.git
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+*.egg-info
+dist
+build
+.testmondata
+.DS_Store
+
+# Frontends + voice agent stay out of the backend image.
+frontend
+frontend-dashboard
+outbound-voice-agent
+node_modules
+**/node_modules
+
+# Local-only env files. Never bake secrets into an image.
+.env
+.env.local
+.env.example
+docker-compose.override.yml
+
+# Tests + dev-only docs.
+tests
+PLAN.md
+SUBMISSION_INFO.md
+quickstart.sh

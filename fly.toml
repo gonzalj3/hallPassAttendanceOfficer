@@ -1,0 +1,57 @@
+# Fly.io app config for the HPAO backend.
+#
+# `fly launch --no-deploy` will rewrite `app` and `primary_region` based on
+# what you pick interactively. Everything else here is intentional and
+# should survive that pass.
+
+app = "hpao-backend"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# All non-secret env. Secrets (DATABASE_URL, OPENAI_API_KEY,
+# BACKEND_HMAC_SECRET / PARENT_COMMS_SECRET, FRONTEND_ORIGIN) go via
+# `fly secrets set` so they don't end up in the image or in source.
+[env]
+  APP_ENV = "production"
+  PORT = "8080"
+  OPENAI_MODEL = "gpt-4o-mini"
+  OPENAI_EMBEDDING_MODEL = "text-embedding-3-small"
+
+# `release_command` runs once before each new release goes live. Both
+# seed CLIs are idempotent — the school + 12-student fixture and the
+# Avery Johnson 14-pass history get re-applied on every deploy without
+# producing duplicates.
+[deploy]
+  release_command = "sh -c 'alembic upgrade head && python -m hpao.cli.seed && python -m hpao.cli.seed_avery'"
+
+# HTTP service is the public-facing surface: REST + WebSocket realtime.
+# auto_stop_machines is OFF and min_machines_running = 1 because the
+# /v1/realtime listener holds a long-lived asyncpg LISTEN connection;
+# letting Fly suspend the machine kills every dashboard's WS subscription.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    grace_period = "10s"
+    method = "get"
+    path = "/healthz"
+    protocol = "http"
+    timeout = "5s"
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 200
+    soft_limit = 100
+
+# Smallest free-tier shape. Bump to 1gb if pgvector queries OOM under
+# real policy-RAG load (the embedding column is 1536-dim float).
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
