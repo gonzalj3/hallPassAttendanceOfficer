@@ -417,22 +417,40 @@ async function startSession(scenario = "absentee") {
     audio.srcObject = event.streams[0];
   };
 
-  try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-    mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
-    setMicrophoneListening(false);
-  } catch (error) {
-    if (!isMicrophonePermissionError(error)) {
-      throw error;
-    }
-
+  // navigator.mediaDevices is only exposed in secure contexts. Browsers
+  // count localhost / 127.0.0.1 over plain HTTP as secure, but only if
+  // the page is loaded directly — not via an iframe with a different
+  // origin, a *.local mDNS name, 0.0.0.0, or some Safari edge cases.
+  // Fall back to listen-only mode with a clear message rather than
+  // throwing an opaque "undefined is not an object" up the stack.
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== "function"
+  ) {
+    setStatus(
+      "Microphone Unavailable",
+      "This browser doesn't expose microphone access here. Open http://localhost:5178 directly in Chrome or Firefox (Safari and non-localhost URLs disable getUserMedia). Listen-only mode below."
+    );
     startListenOnlySession();
+  } else {
+    try {
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+      mediaStream.getAudioTracks().forEach((track) => peerConnection.addTrack(track, mediaStream));
+      setMicrophoneListening(false);
+    } catch (error) {
+      if (!isMicrophonePermissionError(error)) {
+        throw error;
+      }
+
+      startListenOnlySession();
+    }
   }
 
   dataChannel = peerConnection.createDataChannel("oai-events");
