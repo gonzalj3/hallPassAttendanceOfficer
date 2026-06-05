@@ -1,25 +1,14 @@
-"""Realtime layer: event taxonomy, pub/sub abstractions, WebSocket fan-out.
-
-- Phase 4a: `RealtimeEvent` discriminated union, `channels_for()`,
-  `RealtimePublisher` Protocol, `InMemoryPublisher`.
-- Phase 4b: Postgres LISTEN/NOTIFY transport (`PgNotifyPublisher`,
-  `RealtimeListener`).
-- Phase 4c: FastAPI WebSocket endpoint and `make_app()` factory.
-"""
+"""Realtime layer: event taxonomy, pub/sub abstractions, WebSocket fan-out."""
 
 from hpao.realtime.app import make_app
 from hpao.realtime.events import (
     AlertRaised,
-    AttendanceRecorded,
-    AttendanceStatus,
     Destination,
     HallpassIssued,
     HallpassOverdue,
     HallpassReturned,
     RealtimeEvent,
     Severity,
-    VoiceCallCompleted,
-    VoiceCallScenario,
     channels_for,
 )
 from hpao.realtime.postgres import (
@@ -32,8 +21,6 @@ from hpao.realtime.websocket import make_realtime_router
 
 __all__ = [
     "AlertRaised",
-    "AttendanceRecorded",
-    "AttendanceStatus",
     "Destination",
     "HallpassIssued",
     "HallpassOverdue",
@@ -44,8 +31,6 @@ __all__ = [
     "RealtimeListener",
     "RealtimePublisher",
     "Severity",
-    "VoiceCallCompleted",
-    "VoiceCallScenario",
     "asyncpg_dsn",
     "channels_for",
     "make_app",

@@ -1,14 +1,8 @@
 """alerts
 
 Revision ID: 0007
-Revises: 0006
+Revises: 0004
 Create Date: 2026-05-09
-
-Note: filename is 0007 (not 0005) because Phase 5a's migration landed
-ahead of this one with revision=0006 chaining directly from 0004
-(my Phase 6 work was stashed when they wrote it). Re-pointing
-down_revision to 0006 puts the alerts table after the policy schema
-and gives alembic a single linear head.
 """
 
 from collections.abc import Sequence
@@ -18,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0007"
-down_revision: str | None = "0006"
+down_revision: str | None = "0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

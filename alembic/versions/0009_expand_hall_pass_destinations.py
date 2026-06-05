@@ -1,7 +1,7 @@
 """expand hall pass destinations to include HALLWAY and CLASSROOM
 
 Revision ID: 0009
-Revises: 0008
+Revises: 0007
 Create Date: 2026-05-09
 
 The frontend roster UX needs short-trip destinations (water-fountain /
@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "0009"
-down_revision: str | None = "0008"
+down_revision: str | None = "0007"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

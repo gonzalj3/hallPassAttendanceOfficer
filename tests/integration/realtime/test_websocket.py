@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from hpao.realtime import (
-    AttendanceRecorded,
+    HallpassIssued,
     HallpassReturned,
     PgNotifyPublisher,
     RealtimeEvent,
@@ -43,17 +43,18 @@ def _publish_in_thread(database_url: str, event: RealtimeEvent) -> threading.Thr
     return thread
 
 
-def _attendance_event() -> AttendanceRecorded:
-    return AttendanceRecorded(
+def _attendance_event() -> HallpassIssued:
+    return HallpassIssued(
         event_id=uuid4(),
         occurred_at=datetime(2026, 5, 9, 12, 0, tzinfo=UTC),
         school_id=uuid4(),
         student_id=uuid4(),
+        hall_pass_id=uuid4(),
         class_id=uuid4(),
         class_session_id=uuid4(),
-        status="PRESENT",
-        source="teacher",
-        recorded_by=uuid4(),
+        destination="RESTROOM",
+        expected_return_at=datetime(2026, 5, 9, 12, 15, tzinfo=UTC),
+        issued_by=uuid4(),
     )
 
 
@@ -73,9 +74,9 @@ def test_ws_receives_published_event(migrated_database: str) -> None:
             thread.join(timeout=5.0)
 
     assert msg["channel"] == school_channel
-    assert msg["event"]["event"] == "attendance.recorded"
+    assert msg["event"]["event"] == "hallpass.issued"
     assert msg["event"]["event_id"] == str(event.event_id)
-    assert msg["event"]["status"] == "PRESENT"
+    assert msg["event"]["destination"] == "RESTROOM"
 
 
 def test_ws_multiplexes_multiple_channels(migrated_database: str) -> None:

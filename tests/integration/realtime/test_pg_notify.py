@@ -8,7 +8,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from hpao.realtime import (
-    AttendanceRecorded,
+    HallpassIssued,
     HallpassReturned,
     PgNotifyPublisher,
     RealtimeListener,
@@ -29,23 +29,22 @@ async def listener(migrated_database: str) -> AsyncIterator[RealtimeListener]:
         await listener.stop()
 
 
-def _attendance_event() -> AttendanceRecorded:
-    return AttendanceRecorded(
+def _attendance_event() -> HallpassIssued:
+    return HallpassIssued(
         event_id=uuid4(),
         occurred_at=datetime(2026, 5, 9, 12, 0, tzinfo=UTC),
         school_id=uuid4(),
         student_id=uuid4(),
+        hall_pass_id=uuid4(),
         class_id=uuid4(),
         class_session_id=uuid4(),
-        status="PRESENT",
-        source="teacher",
-        recorded_by=uuid4(),
+        destination="RESTROOM",
+        expected_return_at=datetime(2026, 5, 9, 12, 15, tzinfo=UTC),
+        issued_by=uuid4(),
     )
 
 
-async def _publish_committed(
-    engine: AsyncEngine, event: AttendanceRecorded | HallpassReturned
-) -> None:
+async def _publish_committed(engine: AsyncEngine, event: HallpassIssued | HallpassReturned) -> None:
     async with engine.begin() as conn:
         await PgNotifyPublisher(conn).publish(event)
 
@@ -64,7 +63,7 @@ async def test_publish_fans_out_to_each_derived_channel(
             received.append(await asyncio.wait_for(queue.get(), timeout=2.0))
 
     assert sorted(ch for ch, _ in received) == sorted(expected)
-    decoded = AttendanceRecorded.model_validate_json(received[0][1])
+    decoded = HallpassIssued.model_validate_json(received[0][1])
     assert decoded == event
 
 

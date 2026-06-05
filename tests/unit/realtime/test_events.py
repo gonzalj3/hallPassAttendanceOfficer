@@ -6,7 +6,6 @@ from pydantic import TypeAdapter, ValidationError
 
 from hpao.realtime.events import (
     AlertRaised,
-    AttendanceRecorded,
     HallpassIssued,
     HallpassOverdue,
     HallpassReturned,
@@ -26,33 +25,21 @@ def _base_kwargs() -> dict[str, object]:
     }
 
 
-class TestAttendanceRecorded:
-    def test_round_trips_through_discriminated_union(self) -> None:
-        event = AttendanceRecorded(
+class TestHallpassEvents:
+    def test_issued_round_trips_through_discriminated_union(self) -> None:
+        event = HallpassIssued(
             **_base_kwargs(),
+            hall_pass_id=uuid4(),
             class_id=uuid4(),
             class_session_id=uuid4(),
-            status="PRESENT",
-            source="teacher",
-            recorded_by=uuid4(),
+            destination="RESTROOM",
+            expected_return_at=datetime(2026, 5, 9, 12, 15, tzinfo=UTC),
+            issued_by=uuid4(),
         )
         decoded = _adapter.validate_python(event.model_dump(mode="json"))
-        assert isinstance(decoded, AttendanceRecorded)
+        assert isinstance(decoded, HallpassIssued)
         assert decoded == event
 
-    def test_rejects_unknown_status(self) -> None:
-        with pytest.raises(ValidationError):
-            AttendanceRecorded(
-                **_base_kwargs(),
-                class_id=uuid4(),
-                class_session_id=uuid4(),
-                status="NOT_A_STATUS",  # type: ignore[arg-type]
-                source="teacher",
-                recorded_by=uuid4(),
-            )
-
-
-class TestHallpassEvents:
     def test_issued_requires_destination_enum(self) -> None:
         with pytest.raises(ValidationError):
             HallpassIssued(
@@ -104,16 +91,17 @@ class TestAlertRaised:
 
 
 class TestChannelsFor:
-    def test_attendance_fans_out_to_school_student_class(self) -> None:
+    def test_hallpass_issued_fans_out_to_school_student_class(self) -> None:
         base = _base_kwargs()
         class_id = uuid4()
-        event = AttendanceRecorded(
+        event = HallpassIssued(
             **base,
+            hall_pass_id=uuid4(),
             class_id=class_id,
             class_session_id=uuid4(),
-            status="PRESENT",
-            source="teacher",
-            recorded_by=uuid4(),
+            destination="RESTROOM",
+            expected_return_at=datetime(2026, 5, 9, 12, 15, tzinfo=UTC),
+            issued_by=uuid4(),
         )
         assert channels_for(event) == [
             f"school:{base['school_id']}",

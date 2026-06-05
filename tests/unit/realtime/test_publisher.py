@@ -4,24 +4,25 @@ from uuid import uuid4
 import pytest
 
 from hpao.realtime import (
-    AttendanceRecorded,
+    HallpassIssued,
     HallpassReturned,
     InMemoryPublisher,
     RealtimePublisher,
 )
 
 
-def _attendance() -> AttendanceRecorded:
-    return AttendanceRecorded(
+def _hallpass_issued() -> HallpassIssued:
+    return HallpassIssued(
         event_id=uuid4(),
         occurred_at=datetime(2026, 5, 9, 12, 0, tzinfo=UTC),
         school_id=uuid4(),
         student_id=uuid4(),
+        hall_pass_id=uuid4(),
         class_id=uuid4(),
         class_session_id=uuid4(),
-        status="PRESENT",
-        source="teacher",
-        recorded_by=uuid4(),
+        destination="RESTROOM",
+        expected_return_at=datetime(2026, 5, 9, 12, 15, tzinfo=UTC),
+        issued_by=uuid4(),
     )
 
 
@@ -32,7 +33,7 @@ class TestInMemoryPublisher:
     @pytest.mark.asyncio
     async def test_records_event_on_each_derived_channel(self) -> None:
         pub = InMemoryPublisher()
-        event = _attendance()
+        event = _hallpass_issued()
 
         await pub.publish(event)
 
@@ -43,8 +44,8 @@ class TestInMemoryPublisher:
     @pytest.mark.asyncio
     async def test_appends_in_order_per_channel(self) -> None:
         pub = InMemoryPublisher()
-        first = _attendance()
-        second = _attendance().model_copy(update={"school_id": first.school_id})
+        first = _hallpass_issued()
+        second = _hallpass_issued().model_copy(update={"school_id": first.school_id})
 
         await pub.publish(first)
         await pub.publish(second)
@@ -70,6 +71,6 @@ class TestInMemoryPublisher:
     @pytest.mark.asyncio
     async def test_clear_resets_recorded_events(self) -> None:
         pub = InMemoryPublisher()
-        await pub.publish(_attendance())
+        await pub.publish(_hallpass_issued())
         pub.clear()
         assert pub.published == {}

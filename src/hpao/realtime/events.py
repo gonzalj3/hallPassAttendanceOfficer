@@ -5,9 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 Severity = Literal["low", "medium", "high", "critical"]
-AttendanceStatus = Literal["PRESENT", "ABSENT", "TARDY", "EXCUSED", "UNEXCUSED"]
 Destination = Literal["RESTROOM", "NURSE", "COUNSELOR", "OFFICE", "OTHER", "HALLWAY", "CLASSROOM"]
-VoiceCallScenario = Literal["absentee", "hall_pass", "other"]
 
 
 class _EventBase(BaseModel):
@@ -17,15 +15,6 @@ class _EventBase(BaseModel):
     occurred_at: datetime
     school_id: UUID
     student_id: UUID
-
-
-class AttendanceRecorded(_EventBase):
-    event: Literal["attendance.recorded"] = "attendance.recorded"
-    class_id: UUID
-    class_session_id: UUID
-    status: AttendanceStatus
-    source: str
-    recorded_by: UUID
 
 
 class HallpassIssued(_EventBase):
@@ -63,41 +52,14 @@ class AlertRaised(_EventBase):
     evidence: dict[str, Any] = Field(default_factory=dict)
 
 
-class VoiceCallCompleted(_EventBase):
-    """Outbound voice agent finished a parent call. Carries enough metadata
-    for an admin dashboard to render a card (who/when/why) without fetching
-    the full transcript — that's behind the agent_messages.payload JSONB."""
-
-    event: Literal["voice_call.completed"] = "voice_call.completed"
-    agent_message_id: UUID
-    correlation_id: UUID
-    alert_id: UUID | None = None
-    scenario: VoiceCallScenario
-    call_started_at: datetime
-    call_ended_at: datetime
-    parent_confirmed: bool | None = None
-    excuse_summary: str | None = None
-    language: str | None = None
-
-
 RealtimeEvent = Annotated[
-    AttendanceRecorded
-    | HallpassIssued
-    | HallpassReturned
-    | HallpassOverdue
-    | AlertRaised
-    | VoiceCallCompleted,
+    HallpassIssued | HallpassReturned | HallpassOverdue | AlertRaised,
     Field(discriminator="event"),
 ]
 
 
 def channels_for(event: RealtimeEvent) -> list[str]:
-    """Derive pg_notify channels an event fans out to.
-
-    Every event publishes to its school and student channels. Class scope is
-    added when the event is tied to a class (attendance always; hall passes
-    and alerts when a class context is set).
-    """
+    """Derive pg_notify channels an event fans out to."""
     channels = [f"school:{event.school_id}", f"student:{event.student_id}"]
     class_id = getattr(event, "class_id", None)
     if class_id is not None:

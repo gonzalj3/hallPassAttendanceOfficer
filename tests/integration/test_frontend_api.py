@@ -21,7 +21,6 @@ import pytest_asyncio
 from httpx import ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.api.agent import _get_session as _agent_get_session
 from hpao.api.frontend import _get_session as _frontend_get_session
 from hpao.app import make_app
 from hpao.cli.seed import seed
@@ -50,7 +49,6 @@ async def client(
         yield async_session
 
     app.dependency_overrides[_frontend_get_session] = session_dep
-    app.dependency_overrides[_agent_get_session] = session_dep
     async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
@@ -343,135 +341,6 @@ async def test_seed_cli_is_idempotent(async_session: AsyncSession) -> None:
     first = await seed(async_session)
     second = await seed(async_session)
     assert first["school_id"] == second["school_id"]
-
-
-# ---------- voice-call dashboard reads ----------
-
-
-async def _seed_voice_call(
-    async_session: AsyncSession,
-    *,
-    student_id,
-    correlation_id=None,
-    excuse_summary="Doctor appointment.",
-    parent_confirmed=True,
-    scenario="absentee",
-) -> str:
-    """Insert an INBOUND agent_messages row mirroring what the voice agent posts."""
-    from datetime import UTC, datetime
-    from uuid import uuid4
-
-    from hpao.models import AgentMessage
-
-    correlation = correlation_id or uuid4()
-    started = datetime.now(UTC)
-    msg = AgentMessage(
-        direction="INBOUND",
-        counterparty="voice_agent",
-        correlation_id=correlation,
-        student_id=student_id,
-        payload={
-            "scenario": scenario,
-            "call_started_at": started.isoformat(),
-            "call_ended_at": started.isoformat(),
-            "transcript": [
-                {"speaker": "agent", "text": "Hi, calling from the school."},
-                {"speaker": "guardian", "text": "Hello."},
-            ],
-            "excuse_summary": excuse_summary,
-            "parent_confirmed": parent_confirmed,
-            "language": "en",
-        },
-        status="RECEIVED",
-    )
-    async_session.add(msg)
-    await async_session.flush()
-    return str(msg.id)
-
-
-async def test_list_voice_calls_returns_camelcase_envelope(
-    client: httpx.AsyncClient, async_session: AsyncSession
-) -> None:
-    seeded = await _seed_school(async_session)
-    student_id = seeded["students"][0].id  # type: ignore[index]
-    msg_id = await _seed_voice_call(async_session, student_id=student_id)
-
-    response = await client.get("/api/voice-calls")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert len(body) == 1
-    row = body[0]
-    assert row["id"] == msg_id
-    assert row["studentId"] == str(student_id)
-    assert row["studentName"] == "Alice Garcia"
-    assert row["scenario"] == "absentee"
-    assert row["excuseSummary"] == "Doctor appointment."
-    assert row["parentConfirmed"] is True
-    assert "transcript" not in row  # summary endpoint excludes transcript
-
-
-async def test_list_voice_calls_filters_by_student(
-    client: httpx.AsyncClient, async_session: AsyncSession
-) -> None:
-    seeded = await _seed_school(async_session)
-    s_a = seeded["students"][0].id  # type: ignore[index]
-    s_b = seeded["students"][1].id  # type: ignore[index]
-    await _seed_voice_call(async_session, student_id=s_a)
-    await _seed_voice_call(async_session, student_id=s_b)
-
-    response = await client.get("/api/voice-calls", params={"student_id": str(s_a)})
-
-    assert response.status_code == 200
-    body = response.json()
-    assert len(body) == 1
-    assert body[0]["studentId"] == str(s_a)
-
-
-async def test_get_voice_call_returns_full_transcript(
-    client: httpx.AsyncClient, async_session: AsyncSession
-) -> None:
-    seeded = await _seed_school(async_session)
-    student_id = seeded["students"][0].id  # type: ignore[index]
-    msg_id = await _seed_voice_call(async_session, student_id=student_id)
-
-    response = await client.get(f"/api/voice-calls/{msg_id}")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["id"] == msg_id
-    assert len(body["transcript"]) == 2
-    assert body["transcript"][0]["speaker"] == "agent"
-    assert body["transcript"][1]["speaker"] == "guardian"
-
-
-async def test_get_voice_call_404_for_unknown(client: httpx.AsyncClient) -> None:
-    response = await client.get(f"/api/voice-calls/{uuid4()}")
-    assert response.status_code == 404
-
-
-async def test_get_voice_call_404_for_non_voice_agent_message(
-    client: httpx.AsyncClient, async_session: AsyncSession
-) -> None:
-    """Looking up a parent-comms message via the voice-call endpoint must 404."""
-    from datetime import UTC, datetime
-
-    from hpao.models import AgentMessage
-
-    seeded = await _seed_school(async_session)
-    msg = AgentMessage(
-        direction="INBOUND",
-        counterparty="parent_comms",
-        correlation_id=uuid4(),
-        student_id=seeded["students"][0].id,  # type: ignore[index]
-        payload={"received_at": datetime.now(UTC).isoformat(), "body": "x"},
-        status="RECEIVED",
-    )
-    async_session.add(msg)
-    await async_session.flush()
-
-    response = await client.get(f"/api/voice-calls/{msg.id}")
-    assert response.status_code == 404
 
 
 # ---------- alerts ----------

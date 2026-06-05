@@ -1,14 +1,11 @@
-"""Run the alerts dispatcher loop.
+"""Run the overdue-pass monitor loop.
 
-Demo usage:
-    python -m hpao.cli.dispatcher          # forever loop, every dispatcher_interval_seconds
-    python -m hpao.cli.dispatcher --once    # single cycle, then exit
-    python -m hpao.cli.dispatcher --interval 5  # 5-second cycle for live demo
+Usage:
+    python -m hpao.cli.dispatcher              # forever loop
+    python -m hpao.cli.dispatcher --once       # single cycle, then exit
+    python -m hpao.cli.dispatcher --interval 5 # 5-second cycle for live demo
 
-Reads DATABASE_URL, PARENT_COMMS_URL, PARENT_COMMS_SECRET, and
-DISPATCHER_INTERVAL_SECONDS from env (or .env). When PARENT_COMMS_URL /
-SECRET are unset, the loop still runs detect_overdue_passes for state
-hygiene but does not POST outbound webhooks.
+Reads DATABASE_URL and DISPATCHER_INTERVAL_SECONDS from env (or .env).
 """
 
 from __future__ import annotations
@@ -34,16 +31,8 @@ async def _run_once() -> None:
     session_maker = make_session_factory(engine)
     try:
         async with session_maker() as db, db.begin():
-            result = await run_alert_dispatch_cycle(
-                db,
-                parent_comms_base_url=settings.parent_comms_url,
-                parent_comms_secret=settings.parent_comms_secret,
-            )
-        print(
-            f"new_alerts={len(result.new_alerts)} "
-            f"dispatched={len(result.dispatched)} "
-            f"skipped_no_config={result.skipped_no_config}"
-        )
+            result = await run_alert_dispatch_cycle(db)
+        print(f"new_alerts={len(result.new_alerts)}")
     finally:
         await engine.dispose()
 
@@ -55,8 +44,6 @@ async def _run_forever(interval: float | None) -> None:
     try:
         await run_periodic_dispatcher(
             session_maker,
-            parent_comms_base_url=settings.parent_comms_url,
-            parent_comms_secret=settings.parent_comms_secret,
             interval_seconds=interval or settings.dispatcher_interval_seconds,
         )
     finally:

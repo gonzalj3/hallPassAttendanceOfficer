@@ -1,9 +1,9 @@
-"""Browser-facing REST surface for the React/Vite frontend.
+"""Browser-facing REST surface for the React/Vite frontends.
 
-Plain JSON, no HMAC. Composes the existing service layer (Phase 3 hall
-pass service, Phase 1c models). The realtime WS endpoint at /v1/realtime
-is the live-update channel; this router covers the read-and-write CRUD
-the UI drives directly.
+Plain JSON, no auth yet (Phase E adds role-picker). Composes the hall
+pass service. The realtime WS endpoint at /v1/realtime is the
+live-update channel; this router covers the read/write CRUD the UI
+drives directly.
 
 Routes (all prefixed `/api`):
   GET  /sessions                       — today's class sessions
@@ -11,8 +11,7 @@ Routes (all prefixed `/api`):
   POST /hall-passes                    — issue
   POST /hall-passes/{id}/return        — check in
   GET  /hall-passes                    — list, optional status / sessionId filter
-  GET  /voice-calls                    — recent voice-agent conversations
-  GET  /voice-calls/{id}               — full transcript
+  GET  /students/lookup                — first+last name → student record
   GET  /alerts                         — open / acknowledged / resolved alerts
 """
 
@@ -28,7 +27,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hpao.models import (
-    AgentMessage,
     Alert,
     Class,
     ClassEnrollment,
@@ -45,9 +43,6 @@ from hpao.schemas.frontend import (
     IssueHallPassIn,
     RosterOut,
     StudentOut,
-    TranscriptTurnOut,
-    VoiceCallDetailOut,
-    VoiceCallSummaryOut,
 )
 from hpao.services.hall_pass import (
     HallPassConflictError,
@@ -75,7 +70,6 @@ router = APIRouter(prefix="/api", tags=["frontend"])
 
 
 def _grade_level_to_int(raw: str) -> int:
-    """Backend stores K-12 grades as strings; frontend's TS type is `number`."""
     return int(raw) if raw.isdigit() else 0
 
 
@@ -89,7 +83,6 @@ def _student_to_out(student: Student) -> StudentOut:
 
 
 def _format_time(t: time) -> str:
-    """Produce the zero-padded "08:30 AM" shape the existing UI mocks use."""
     return t.strftime("%I:%M %p")
 
 
@@ -101,12 +94,6 @@ def _classify_period(
     end: time,
     now_local: time,
 ) -> str:
-    """Map a session into one of frontend's four `type` values.
-
-    Single-school hackathon, single-timezone demo: "suggested" is whichever
-    session contains the current local time. Specially-named periods get
-    their own buckets so the frontend can style them differently.
-    """
     if start <= now_local <= end:
         return "suggested"
     if "lunch" in period.lower() or "lunch" in name.lower():
@@ -147,7 +134,7 @@ async def _session_to_period(
     now_local: time,
 ) -> ClassPeriodOut:
     cls = await db.get(Class, session.class_id)
-    if cls is None:  # FK enforces existence; defensive for type checkers
+    if cls is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"class {session.class_id} missing for session {session.id}",
@@ -176,7 +163,6 @@ async def _session_to_period(
 
 
 def _today_local() -> tuple[date, time]:
-    """School-local 'now' — single-school hackathon assumes server local time."""
     now = datetime.now()
     return now.date(), now.time()
 
@@ -186,12 +172,6 @@ def _today_local() -> tuple[date, time]:
 
 @router.get("/sessions", response_model=list[ClassPeriodOut], response_model_by_alias=True)
 async def list_sessions(db: SessionDep) -> list[ClassPeriodOut]:
-    """Today's class sessions for the demo school.
-
-    Frontend `id` is the ClassSession id, not the Class id — that's what
-    /sessions/{id}/students and POST /hall-passes both key off, so a single
-    URL parameter survives the whole flow.
-    """
     today, now_local = _today_local()
     stmt = select(ClassSession).where(ClassSession.date == today)
     sessions = list((await db.execute(stmt)).scalars().all())
@@ -244,14 +224,13 @@ async def get_roster(session_id: UUID, db: SessionDep) -> RosterOut:
     status_code=status.HTTP_201_CREATED,
 )
 async def issue_hall_pass(payload: IssueHallPassIn, db: SessionDep) -> HallPassOut:
-    """Issue a pass. Teacher (`issued_by`) is inferred from the class_session."""
     session = await db.get(ClassSession, payload.session_id)
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"session {payload.session_id} not found"
         )
     cls = await db.get(Class, session.class_id)
-    if cls is None:  # FK guarantees this; defensive
+    if cls is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="class FK")
 
     try:
@@ -302,9 +281,6 @@ async def list_hall_passes(
     return [await _hall_pass_to_out(db, hp) for hp in rows]
 
 
-# ---------- student lookup (used by the voice agent for CSV->UUID mapping) ----------
-
-
 @router.get(
     "/students/lookup",
     response_model=StudentOut,
@@ -315,12 +291,6 @@ async def lookup_student(
     first_name: str,
     last_name: str,
 ) -> StudentOut:
-    """Resolve `first_name` + `last_name` to the backend's student record.
-
-    Useful for callers (the voice agent, ad-hoc CLIs) that hold a name
-    rather than a UUID. Single-school hackathon assumption: the (first,
-    last) pair is unique. Returns 404 if no match, 409 if multiple.
-    """
     rows = list(
         (
             await db.execute(
@@ -340,108 +310,9 @@ async def lookup_student(
     if len(rows) > 1:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"multiple students named {first_name} {last_name} — disambiguate with student_number",
+            detail=f"multiple students named {first_name} {last_name}",
         )
     return _student_to_out(rows[0])
-
-
-# ---------- voice-call dashboard reads ----------
-
-
-VOICE_AGENT_COUNTERPARTY = "voice_agent"
-
-
-def _voice_call_summary(msg: AgentMessage, student: Student) -> dict[str, Any]:
-    p = dict(msg.payload)
-    return {
-        "id": msg.id,
-        "correlation_id": msg.correlation_id,
-        "student_id": msg.student_id,
-        "student_name": f"{student.first_name} {student.last_name}",
-        "alert_id": msg.alert_id,
-        "scenario": p.get("scenario", "other"),
-        "call_started_at": p["call_started_at"],
-        "call_ended_at": p["call_ended_at"],
-        "excuse_summary": p.get("excuse_summary"),
-        "parent_confirmed": p.get("parent_confirmed"),
-        "language": p.get("language"),
-        "created_at": msg.created_at,
-    }
-
-
-@router.get(
-    "/voice-calls",
-    response_model=list[VoiceCallSummaryOut],
-    response_model_by_alias=True,
-)
-async def list_voice_calls(
-    db: SessionDep,
-    limit: int = 20,
-    student_id: UUID | None = None,
-) -> list[VoiceCallSummaryOut]:
-    """Most-recent finished voice-agent conversations (no transcript body).
-
-    Default limit 20 keeps the admin dashboard's first paint cheap; clients
-    can ask for more or scope by student to power the per-student timeline.
-    """
-    stmt = (
-        select(AgentMessage)
-        .where(
-            AgentMessage.counterparty == VOICE_AGENT_COUNTERPARTY,
-            AgentMessage.direction == "INBOUND",
-        )
-        .order_by(AgentMessage.created_at.desc())
-        .limit(min(limit, 200))
-    )
-    if student_id is not None:
-        stmt = stmt.where(AgentMessage.student_id == student_id)
-    msgs = list((await db.execute(stmt)).scalars().all())
-    if not msgs:
-        return []
-
-    student_ids = {m.student_id for m in msgs if m.student_id is not None}
-    students = (
-        (await db.execute(select(Student).where(Student.id.in_(student_ids)))).scalars().all()
-    )
-    by_id = {s.id: s for s in students}
-
-    out: list[VoiceCallSummaryOut] = []
-    for m in msgs:
-        student = by_id.get(m.student_id) if m.student_id is not None else None
-        if student is None:  # voice-agent calls always have a student FK
-            continue
-        out.append(VoiceCallSummaryOut.model_validate(_voice_call_summary(m, student)))
-    return out
-
-
-@router.get(
-    "/voice-calls/{message_id}",
-    response_model=VoiceCallDetailOut,
-    response_model_by_alias=True,
-)
-async def get_voice_call(message_id: UUID, db: SessionDep) -> VoiceCallDetailOut:
-    msg = await db.get(AgentMessage, message_id)
-    if msg is None or msg.counterparty != VOICE_AGENT_COUNTERPARTY:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"voice call {message_id} not found",
-        )
-    if msg.student_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"voice call {message_id} has no student_id",
-        )
-    student = await db.get(Student, msg.student_id)
-    if student is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"student {msg.student_id} not found",
-        )
-    summary = _voice_call_summary(msg, student)
-    summary["transcript"] = [
-        TranscriptTurnOut.model_validate(t) for t in (msg.payload.get("transcript", []) or [])
-    ]
-    return VoiceCallDetailOut.model_validate(summary)
 
 
 # ---------- alerts ----------
@@ -458,11 +329,6 @@ async def list_alerts(
     student_id: UUID | None = None,
     limit: int = 50,
 ) -> list[AlertSummaryOut]:
-    """Alerts for the dashboard's Live Activity tab.
-
-    Default behavior returns every status, ordered most-recent first. Use
-    `status_filter=OPEN` to restrict to actionable items.
-    """
     stmt = select(Alert)
     if status_filter is not None:
         stmt = stmt.where(Alert.status == status_filter)

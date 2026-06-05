@@ -1,4 +1,0 @@
-student_id,student_first_name,student_last_name,parent_name,parent_phone,guardian_language,absences_this_year,absent_date
-STU-1001,Avery,Johnson,Morgan Johnson,+1-555-0101,Spanish,4,2026-05-09
-STU-1002,Sofia,Martinez,Daniel Martinez,+1-555-0102,Spanish,9,2026-05-09
-STU-1003,Eli,Chen,Pat Chen,+1-555-0103,Mandarin,11,2026-05-09
