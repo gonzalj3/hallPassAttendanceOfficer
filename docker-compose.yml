@@ -1,19 +1,19 @@
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: postgres:16
     environment:
-      POSTGRES_USER: hpao
-      POSTGRES_PASSWORD: hpao
-      POSTGRES_DB: hpao
+      POSTGRES_USER: lizzie
+      POSTGRES_PASSWORD: lizzie
+      POSTGRES_DB: lizzie
     ports:
       - "5432:5432"
     volumes:
-      - hpao_pg:/var/lib/postgresql/data
+      - lizzie_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "hpao"]
+      test: ["CMD", "pg_isready", "-U", "lizzie"]
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  hpao_pg:
+  lizzie_pg:
