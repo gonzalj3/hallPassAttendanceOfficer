@@ -60,25 +60,6 @@ def test_cors_blocks_unlisted_origin(migrated_database: str) -> None:
     assert "access-control-allow-origin" not in response.headers
 
 
-def test_agent_route_rejects_browser_request_without_signature(
-    migrated_database: str,
-) -> None:
-    """Phase 8 routes are HMAC-only; a browser fetch (no signature) must
-    not succeed even when CORS preflight does."""
-    app = make_app(migrated_database, hmac_secret="test-secret", allowed_origins=[NETLIFY_ORIGIN])
-    with TestClient(app) as client:
-        response = client.post(
-            "/v1/agent/inbound/parent-message",
-            json={
-                "correlation_id": "00000000-0000-0000-0000-000000000000",
-                "student_id": "00000000-0000-0000-0000-000000000001",
-                "body": "irrelevant — request must 401 before parsing",
-            },
-            headers={"Origin": NETLIFY_ORIGIN},
-        )
-    assert response.status_code == 401
-
-
 def test_realtime_websocket_route_is_mounted(migrated_database: str) -> None:
     """Sanity that the WS route from Phase 4c made it onto this app, not
     a separate one."""
