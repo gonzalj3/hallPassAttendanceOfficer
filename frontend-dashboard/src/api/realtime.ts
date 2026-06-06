@@ -4,19 +4,9 @@ import { useEffect, useRef } from 'react';
 import type { RealtimeEnvelope } from './types';
 
 function deriveWsBase(): string {
-  const explicit = import.meta.env.VITE_WS_URL as string | undefined;
-  if (explicit) return explicit;
-  const apiBase = import.meta.env.VITE_API_URL as string | undefined;
-  if (apiBase) return apiBase.replace(/^http/, 'ws');
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'ws://localhost:8000';
-    }
-    const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${scheme}://${window.location.host}`;
-  }
-  return '';
+  if (typeof window === 'undefined') return '';
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${window.location.host}`;
 }
 
 const WS_BASE = deriveWsBase();

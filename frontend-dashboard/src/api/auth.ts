@@ -1,17 +1,6 @@
 // Role-picker auth: same wire shape as the teacher frontend.
 
-function defaultApiBase(): string {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'http://localhost:8000';
-    }
-  }
-  return '';
-}
-
-const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiBase();
+const API_BASE = '';
 
 export type DemoRole = 'TEACHER' | 'ADMIN';
 

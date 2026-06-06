@@ -1,20 +1,9 @@
 // Role-picker auth: signs in as the seeded demo Teacher or Principal
 // and stores the session in an HttpOnly cookie set by the backend.
-// API_BASE matches client.ts: relative in prod (Netlify proxy makes
-// the cookie first-party), localhost:8000 in dev.
+// Always relative URLs -- vite proxy (dev) or netlify rewrite (prod)
+// gets the request to FastAPI. Session cookie is first-party either way.
 
-function defaultApiBase(): string {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'http://localhost:8000';
-    }
-  }
-  return '';
-}
-
-const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiBase();
+const API_BASE = '';
 
 export type DemoRole = 'TEACHER' | 'ADMIN';
 

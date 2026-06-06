@@ -1,12 +1,11 @@
 // Browser-side fetch helpers for the FastAPI backend.
 //
-// In production we use RELATIVE URLs (API_BASE = '') so requests go
-// through the Netlify proxy redirects (netlify.toml) and the session
-// cookie lives on the Netlify origin -- first-party, not blocked by
-// Safari ITP / Chrome privacy sandbox.
-//
-// In local dev we hit the FastAPI process directly on localhost:8000
-// (set VITE_API_URL in frontend/.env.local to change the port).
+// All fetches use RELATIVE URLs. In dev, vite.config.ts proxies
+// /api, /auth, /v1 to localhost:8000. In prod, netlify.toml's
+// [[redirects]] proxy the same paths to Railway. The session cookie
+// lives on the page's origin (first-party) so it's not blocked by
+// browser cross-site cookie policies. No env vars consulted -- a
+// stale VITE_API_URL in a CI dashboard can't break sign-in.
 
 import type { Destination, HallPass } from '../types';
 import type {
@@ -16,18 +15,7 @@ import type {
   RosterApi,
 } from './types';
 
-function defaultApiBase(): string {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'http://localhost:8000';
-    }
-  }
-  return '';
-}
-
-const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiBase();
+const API_BASE = '';
 
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {
