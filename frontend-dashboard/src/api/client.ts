@@ -20,7 +20,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const res = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include' });
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -57,17 +57,17 @@ export async function listAlerts(opts?: {
   return request<AlertSummaryApi[]>(path);
 }
 
-export async function listVoiceCalls(opts?: {
+// Voice-agent integration was removed when the project was scoped down to
+// hall-pass monitoring only. These stubs keep the dashboard's UI cards
+// compiling -- they always resolve to empty data so the cards render their
+// empty state.
+export async function listVoiceCalls(_opts?: {
   limit?: number;
   studentId?: string;
 }): Promise<VoiceCallSummaryApi[]> {
-  const qs = new URLSearchParams();
-  if (opts?.limit) qs.set('limit', String(opts.limit));
-  if (opts?.studentId) qs.set('student_id', opts.studentId);
-  const path = qs.toString() ? `/api/voice-calls?${qs}` : '/api/voice-calls';
-  return request<VoiceCallSummaryApi[]>(path);
+  return [];
 }
 
-export async function getVoiceCall(id: string): Promise<VoiceCallDetailApi> {
-  return request<VoiceCallDetailApi>(`/api/voice-calls/${id}`);
+export async function getVoiceCall(_id: string): Promise<VoiceCallDetailApi> {
+  throw new Error('voice-agent integration removed');
 }

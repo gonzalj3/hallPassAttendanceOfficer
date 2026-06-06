@@ -1,29 +1,18 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getMe, signIn, type DemoRole } from '../api/auth';
+import { useState } from 'react';
+import { signIn, type DemoRole } from '../api/auth';
 
-const BRAND = '#079da8';
+const BRAND = '#00666e';
 
-export function LoginPage() {
-  const navigate = useNavigate();
+export function LoginPage({ onSignedIn }: { onSignedIn: () => void }) {
   const [busy, setBusy] = useState<DemoRole | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // If a session is already active, skip the picker.
-  useEffect(() => {
-    void (async () => {
-      const me = await getMe();
-      if (me?.role === 'TEACHER') navigate('/classes', { replace: true });
-      if (me?.role === 'ADMIN') navigate('/admin', { replace: true });
-    })();
-  }, [navigate]);
 
   async function pick(role: DemoRole) {
     setBusy(role);
     setError(null);
     try {
-      const me = await signIn(role);
-      navigate(me.role === 'ADMIN' ? '/admin' : '/classes', { replace: true });
+      await signIn(role);
+      onSignedIn();
     } catch (e) {
       setError((e as Error).message);
       setBusy(null);
@@ -50,12 +39,10 @@ export function LoginPage() {
             >
               <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
               <rect x="9" y="3" width="6" height="4" rx="2" />
-              <path d="M9 12h6" />
-              <path d="M9 16h4" />
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Monitor Lizzie</h1>
-          <p className="text-gray-500 mt-2">Choose how you want to sign in.</p>
+          <p className="text-gray-500 mt-2">Operations Console</p>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
@@ -68,10 +55,12 @@ export function LoginPage() {
             <div>
               <div className="text-3xl mb-3">🧑‍🏫</div>
               <div className="font-semibold text-lg text-gray-900">Teacher</div>
-              <div className="text-sm text-gray-500 mt-1">Ms. Rivera · Algebra I</div>
+              <div className="text-sm text-gray-500 mt-1">
+                Use the iPad app instead
+              </div>
             </div>
-            <div className="text-sm font-medium" style={{ color: BRAND }}>
-              {busy === 'TEACHER' ? 'Signing in…' : 'Continue →'}
+            <div className="text-sm text-gray-400">
+              {busy === 'TEACHER' ? 'Signing in…' : 'Wrong app for this role'}
             </div>
           </button>
 

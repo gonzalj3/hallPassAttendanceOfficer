@@ -6,6 +6,7 @@ import { RosterPage } from './pages/RosterPage';
 import { DestinationPage } from './pages/DestinationPage';
 import { PassActivePage } from './pages/PassActivePage';
 import AdminDashboard from './pages/AdminDashboard';
+import { RequireAuth } from './components/RequireAuth';
 
 export default function App() {
   return (
@@ -13,11 +14,46 @@ export default function App() {
       <AppProvider>
         <Routes>
           <Route path="/" element={<LoginPage />} />
-          <Route path="/classes" element={<ClassSelectPage />} />
-          <Route path="/roster/:sessionId" element={<RosterPage />} />
-          <Route path="/destination/:studentId" element={<DestinationPage />} />
-          <Route path="/pass-active" element={<PassActivePage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route
+            path="/classes"
+            element={
+              <RequireAuth role="TEACHER">
+                <ClassSelectPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/roster/:sessionId"
+            element={
+              <RequireAuth role="TEACHER">
+                <RosterPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/destination/:studentId"
+            element={
+              <RequireAuth role="TEACHER">
+                <DestinationPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/pass-active"
+            element={
+              <RequireAuth role="TEACHER">
+                <PassActivePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth role="ADMIN">
+                <AdminDashboard />
+              </RequireAuth>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppProvider>

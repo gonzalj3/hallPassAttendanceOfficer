@@ -33,7 +33,12 @@ logger = logging.getLogger(__name__)
 
 SCHOOL_NAME = "Lincoln High"
 SCHOOL_DISTRICT = "Pflugerville ISD"
-TEACHER_EMAIL = "demo.teacher@lincoln.edu"
+TEACHER_EMAIL = "ms.rivera@lincoln.edu"
+TEACHER_FIRST = "Ms."
+TEACHER_LAST = "Rivera"
+ADMIN_EMAIL = "dr.chen@lincoln.edu"
+ADMIN_FIRST = "Dr."
+ADMIN_LAST = "Chen"
 
 # Mock classes the frontend already styles (Biology, Algebra, English).
 # Times bracket the school day so the /api/sessions `type` heuristic puts
@@ -103,10 +108,22 @@ async def seed(db: AsyncSession) -> dict[str, UUID]:
             school_id=school.id,
             email=TEACHER_EMAIL,
             role="TEACHER",
-            first_name="Demo",
-            last_name="Teacher",
+            first_name=TEACHER_FIRST,
+            last_name=TEACHER_LAST,
         )
         db.add(teacher)
+        await db.flush()
+
+    admin = (await db.execute(select(User).where(User.email == ADMIN_EMAIL))).scalar_one_or_none()
+    if admin is None:
+        admin = User(
+            school_id=school.id,
+            email=ADMIN_EMAIL,
+            role="ADMIN",
+            first_name=ADMIN_FIRST,
+            last_name=ADMIN_LAST,
+        )
+        db.add(admin)
         await db.flush()
 
     students: list[Student] = []
