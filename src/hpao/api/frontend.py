@@ -26,6 +26,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hpao.auth.dependencies import CurrentUser, current_user
 from hpao.models import (
     Alert,
     Class,
@@ -44,12 +45,15 @@ from hpao.schemas.frontend import (
     RosterOut,
     StudentOut,
 )
+from hpao.services.audit import write_audit
 from hpao.services.hall_pass import (
     HallPassConflictError,
     HallPassValidationError,
     check_in_pass,
     issue_pass,
 )
+
+CurrentUserDep = Annotated[CurrentUser, Depends(current_user)]
 
 
 def _get_session() -> AsyncSession:
@@ -223,7 +227,9 @@ async def get_roster(session_id: UUID, db: SessionDep) -> RosterOut:
     response_model_by_alias=True,
     status_code=status.HTTP_201_CREATED,
 )
-async def issue_hall_pass(payload: IssueHallPassIn, db: SessionDep) -> HallPassOut:
+async def issue_hall_pass(
+    payload: IssueHallPassIn, db: SessionDep, actor: CurrentUserDep
+) -> HallPassOut:
     session = await db.get(ClassSession, payload.session_id)
     if session is None:
         raise HTTPException(
@@ -248,6 +254,17 @@ async def issue_hall_pass(payload: IssueHallPassIn, db: SessionDep) -> HallPassO
     except HallPassValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
+    await write_audit(
+        db,
+        user=actor,
+        action="hall_pass.issue",
+        target_type="hall_pass",
+        target_id=hp.id,
+        context={
+            "student_id": str(hp.student_id),
+            "destination": hp.destination,
+        },
+    )
     return await _hall_pass_to_out(db, hp)
 
 
@@ -256,12 +273,20 @@ async def issue_hall_pass(payload: IssueHallPassIn, db: SessionDep) -> HallPassO
     response_model=HallPassOut,
     response_model_by_alias=True,
 )
-async def return_hall_pass(pass_id: UUID, db: SessionDep) -> HallPassOut:
+async def return_hall_pass(pass_id: UUID, db: SessionDep, actor: CurrentUserDep) -> HallPassOut:
     try:
         hp = await check_in_pass(db, pass_id=pass_id)
     except HallPassValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
+    await write_audit(
+        db,
+        user=actor,
+        action="hall_pass.return",
+        target_type="hall_pass",
+        target_id=hp.id,
+        context={"student_id": str(hp.student_id)},
+    )
     return await _hall_pass_to_out(db, hp)
 
 

@@ -21,8 +21,10 @@ import pytest_asyncio
 from httpx import ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from hpao.api.admin import _get_session as _admin_get_session
 from hpao.api.frontend import _get_session as _frontend_get_session
 from hpao.app import make_app
+from hpao.auth.dependencies import _get_db_session as _auth_get_session
 from hpao.cli.seed import seed
 from hpao.models import (
     Class,
@@ -40,7 +42,11 @@ pytestmark = pytest.mark.integration
 async def client(
     migrated_database: str, async_session: AsyncSession
 ) -> AsyncIterator[httpx.AsyncClient]:
-    app = make_app(migrated_database, allowed_origins=["http://localhost:3000"])
+    app = make_app(
+        migrated_database,
+        session_secret="integration-test-secret",
+        allowed_origins=["http://localhost:3000"],
+    )
 
     async def session_dep() -> AsyncIterator[AsyncSession]:
         # Share the test's transactional session so setup writes are
@@ -49,8 +55,15 @@ async def client(
         yield async_session
 
     app.dependency_overrides[_frontend_get_session] = session_dep
+    app.dependency_overrides[_admin_get_session] = session_dep
+    app.dependency_overrides[_auth_get_session] = session_dep
     async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+async def _sign_in(client: httpx.AsyncClient, role: str = "TEACHER") -> None:
+    response = await client.post("/auth/role-pick", json={"role": role})
+    assert response.status_code == 200, response.text
 
 
 async def _seed_school(async_session: AsyncSession) -> dict[str, object]:
@@ -134,6 +147,7 @@ async def test_list_sessions_returns_today(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
 
     response = await client.get("/api/sessions")
 
@@ -154,6 +168,7 @@ async def test_get_roster_returns_students_and_active_passes(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
 
     response = await client.get(f"/api/sessions/{seeded['session_id']}/students")
 
@@ -179,6 +194,7 @@ async def test_issue_hall_pass_creates_active_pass(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
 
     response = await client.post(
@@ -205,6 +221,7 @@ async def test_issue_hall_pass_accepts_new_destinations(
     """Migration 0009 added HALLWAY + CLASSROOM so the frontend's vocabulary
     works without a translation layer."""
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
 
     response = await client.post(
@@ -223,6 +240,7 @@ async def test_issue_hall_pass_rejects_unknown_destination(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
 
     response = await client.post(
@@ -240,6 +258,7 @@ async def test_issue_hall_pass_conflicts_when_student_already_active(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
 
     first = await client.post(
@@ -267,6 +286,7 @@ async def test_return_hall_pass_marks_returned(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
 
     issued = await client.post(
@@ -290,6 +310,7 @@ async def test_roster_active_passes_include_freshly_issued_pass(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
 
     await client.post(
@@ -313,6 +334,7 @@ async def test_list_hall_passes_filters_by_status(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     s0 = seeded["students"][0].id  # type: ignore[index]
 
     issued = await client.post(
@@ -352,6 +374,7 @@ async def test_list_alerts_returns_camelcase_envelope(
     from hpao.services.alerts import raise_alert
 
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     student_id = seeded["students"][0].id  # type: ignore[index]
     alert = await raise_alert(
         async_session,
@@ -383,6 +406,7 @@ async def test_list_alerts_status_filter(
     from hpao.services.alerts import acknowledge_alert, raise_alert
 
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     s_a = seeded["students"][0].id  # type: ignore[index]
     s_b = seeded["students"][1].id  # type: ignore[index]
     teacher_id = seeded["teacher_id"]
@@ -409,6 +433,7 @@ async def test_lookup_student_returns_uuid_for_known_name(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     seeded = await _seed_school(async_session)
+    await _sign_in(client)
     expected = seeded["students"][0]  # type: ignore[index]
 
     response = await client.get(
@@ -427,6 +452,7 @@ async def test_lookup_student_404_when_not_found(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
     await _seed_school(async_session)
+    await _sign_in(client)
     response = await client.get(
         "/api/students/lookup",
         params={"first_name": "Nobody", "last_name": "Here"},

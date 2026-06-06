@@ -1,4 +1,5 @@
 from hpao.models.alert import ALERT_SEVERITIES, ALERT_STATUSES, Alert
+from hpao.models.audit_log import AuditLog
 from hpao.models.class_ import Class
 from hpao.models.class_enrollment import ClassEnrollment
 from hpao.models.class_session import ClassSession
@@ -19,6 +20,7 @@ __all__ = [
     "HALL_PASS_STATUSES",
     "USER_ROLES",
     "Alert",
+    "AuditLog",
     "Class",
     "ClassEnrollment",
     "ClassSession",

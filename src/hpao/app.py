@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from hpao.api import admin as admin_api
 from hpao.api import frontend as frontend_api
 from hpao.auth import mount as mount_auth
 from hpao.config import Settings, get_settings
@@ -87,6 +88,7 @@ def make_app(
                 await session.commit()
 
     frontend_api.mount(app, session_provider=session_dep)
+    admin_api.mount(app, session_provider=session_dep)
     mount_auth(
         app,
         session_provider=session_dep,
