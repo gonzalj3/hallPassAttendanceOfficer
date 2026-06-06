@@ -1,7 +1,7 @@
 [project]
 name = "hpao"
-version = "0.1.0"
-description = "Hall Pass Attendance Officer -- backend + monitoring agent"
+version = "0.2.0"
+description = "Monitor Lizzie -- digital hall-pass tracker for K-12"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,9 +12,6 @@ dependencies = [
     "alembic>=1.14",
     "pydantic>=2.10",
     "pydantic-settings>=2.6",
-    "pgvector>=0.3",
-    "openai>=1.55",
-    "openai-agents>=0.1",
     "httpx>=0.27",
     "python-dateutil>=2.9",
 ]
@@ -54,7 +51,6 @@ markers = [
 [tool.coverage.run]
 source = ["src/hpao"]
 branch = true
-omit = ["src/hpao/agent/*"]
 
 [tool.coverage.report]
 show_missing = true
@@ -86,9 +82,5 @@ files = ["src/hpao"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = "hpao.agent.*"
-strict = false
-
-[[tool.mypy.overrides]]
-module = ["testcontainers.*", "factory.*", "freezegun.*", "pgvector.*", "asyncpg.*"]
+module = ["testcontainers.*", "factory.*", "freezegun.*", "asyncpg.*"]
 ignore_missing_imports = true
