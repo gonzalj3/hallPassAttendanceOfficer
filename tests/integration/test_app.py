@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from hpao.app import make_app
+from lizzie.app import make_app
 
 pytestmark = pytest.mark.integration
 

@@ -4,7 +4,7 @@ The 15-minute restroom default is the trigger for the 15-min on-duty admin
 alert in Phase 6. If it changes, that alert's expected behavior changes too.
 """
 
-from hpao.services.hall_pass import (
+from lizzie.services.hall_pass import (
     DEFAULT_DURATION_MINUTES,
     default_duration_minutes,
 )
@@ -39,7 +39,7 @@ def test_unknown_destination_falls_back_to_15() -> None:
 def test_default_durations_table_covers_all_known_destinations() -> None:
     """Tripwire: if HALL_PASS_DESTINATIONS gains a member, this test fails
     until DEFAULT_DURATION_MINUTES is updated alongside it."""
-    from hpao.models import HALL_PASS_DESTINATIONS
+    from lizzie.models import HALL_PASS_DESTINATIONS
 
     missing = set(HALL_PASS_DESTINATIONS) - set(DEFAULT_DURATION_MINUTES)
     assert not missing, f"missing default durations for: {missing}"

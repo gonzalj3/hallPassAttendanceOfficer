@@ -12,8 +12,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.models import ClassSession, Student, User
-from hpao.services.hall_pass import (
+from lizzie.models import ClassSession, Student, User
+from lizzie.services.hall_pass import (
     HallPassConflictError,
     check_in_pass,
     find_overdue_active_passes,

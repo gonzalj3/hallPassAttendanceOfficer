@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from hpao.models import USER_ROLES, User
+from lizzie.models import USER_ROLES, User
 
 
 def test_user_construction() -> None:

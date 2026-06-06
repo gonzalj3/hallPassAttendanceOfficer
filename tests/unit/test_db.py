@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
-from hpao.db import Base, make_engine, make_session_factory
+from lizzie.db import Base, make_engine, make_session_factory
 
 
 def test_base_metadata_has_naming_convention() -> None:

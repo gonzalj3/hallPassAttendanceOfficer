@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.models import Class, ClassEnrollment, ClassSession, User
+from lizzie.models import Class, ClassEnrollment, ClassSession, User
 from tests.factories import (
     ClassEnrollmentFactory,
     ClassFactory,

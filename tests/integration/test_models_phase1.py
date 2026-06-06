@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.models import School, Student
+from lizzie.models import School, Student
 from tests.factories import SchoolFactory, StudentFactory
 
 pytestmark = pytest.mark.integration

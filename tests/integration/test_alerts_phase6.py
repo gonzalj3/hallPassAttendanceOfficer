@@ -13,8 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.models import ClassSession, HallPass, Student, User
-from hpao.services.alerts import (
+from lizzie.models import ClassSession, HallPass, Student, User
+from lizzie.services.alerts import (
     acknowledge_alert,
     detect_overdue_passes,
     list_alerts_for_student,
@@ -22,7 +22,7 @@ from hpao.services.alerts import (
     raise_alert,
     resolve_alert,
 )
-from hpao.services.hall_pass import issue_pass
+from lizzie.services.hall_pass import issue_pass
 from tests.factories import (
     AlertFactory,
     ClassFactory,

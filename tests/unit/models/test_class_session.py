@@ -1,7 +1,7 @@
 from datetime import date, time
 from uuid import uuid4
 
-from hpao.models import ClassSession
+from lizzie.models import ClassSession
 
 
 def test_class_session_construction() -> None:

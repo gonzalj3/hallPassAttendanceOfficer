@@ -1,5 +1,5 @@
 // Wire shapes returned by the FastAPI backend at /api/*. Mirrors
-// `src/hpao/schemas/frontend.py` byte-for-byte.
+// `src/lizzie/schemas/frontend.py` byte-for-byte.
 
 export type ClassPeriodType = 'suggested' | 'advisory' | 'lunch' | 'regular';
 export type HallPassStatus = 'ACTIVE' | 'RETURNED' | 'OVERDUE' | 'FLAGGED';

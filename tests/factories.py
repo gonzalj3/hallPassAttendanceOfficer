@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import factory
 
-from hpao.models import (
+from lizzie.models import (
     Alert,
     Class,
     ClassEnrollment,

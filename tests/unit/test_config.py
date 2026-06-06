@@ -1,6 +1,6 @@
 import pytest
 
-from hpao.config import Settings
+from lizzie.config import Settings
 
 
 def test_settings_accepts_kwargs() -> None:
@@ -57,6 +57,6 @@ def test_settings_renames_sslmode_require_to_ssl_require() -> None:
 
 def test_settings_keeps_other_query_params_alongside_ssl_rename() -> None:
     """Don't drop unrelated query params while renaming sslmode."""
-    s = Settings(database_url="postgres://u:p@h:5432/d?sslmode=disable&application_name=hpao")
+    s = Settings(database_url="postgres://u:p@h:5432/d?sslmode=disable&application_name=lizzie")
     # urlencode preserves insertion order; sslmode was first.
-    assert s.database_url == "postgresql+asyncpg://u:p@h:5432/d?ssl=disable&application_name=hpao"
+    assert s.database_url == "postgresql+asyncpg://u:p@h:5432/d?ssl=disable&application_name=lizzie"

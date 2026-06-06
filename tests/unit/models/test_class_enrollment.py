@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import uuid4
 
-from hpao.models import ClassEnrollment
+from lizzie.models import ClassEnrollment
 
 
 def test_class_enrollment_construction() -> None:

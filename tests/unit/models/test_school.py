@@ -1,4 +1,4 @@
-from hpao.models import School
+from lizzie.models import School
 
 
 def test_school_construction() -> None:

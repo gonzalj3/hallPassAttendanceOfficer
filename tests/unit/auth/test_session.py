@@ -1,6 +1,6 @@
 import pytest
 
-from hpao.auth.session import sign_session, verify_session
+from lizzie.auth.session import sign_session, verify_session
 
 SECRET = "test-secret-please-rotate"
 

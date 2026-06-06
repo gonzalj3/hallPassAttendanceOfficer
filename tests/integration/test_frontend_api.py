@@ -21,12 +21,12 @@ import pytest_asyncio
 from httpx import ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.api.admin import _get_session as _admin_get_session
-from hpao.api.frontend import _get_session as _frontend_get_session
-from hpao.app import make_app
-from hpao.auth.dependencies import _get_db_session as _auth_get_session
-from hpao.cli.seed import seed
-from hpao.models import (
+from lizzie.api.admin import _get_session as _admin_get_session
+from lizzie.api.frontend import _get_session as _frontend_get_session
+from lizzie.app import make_app
+from lizzie.auth.dependencies import _get_db_session as _auth_get_session
+from lizzie.cli.seed import seed
+from lizzie.models import (
     Class,
     ClassEnrollment,
     ClassSession,
@@ -371,7 +371,7 @@ async def test_seed_cli_is_idempotent(async_session: AsyncSession) -> None:
 async def test_list_alerts_returns_camelcase_envelope(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
-    from hpao.services.alerts import raise_alert
+    from lizzie.services.alerts import raise_alert
 
     seeded = await _seed_school(async_session)
     await _sign_in(client)
@@ -403,7 +403,7 @@ async def test_list_alerts_returns_camelcase_envelope(
 async def test_list_alerts_status_filter(
     client: httpx.AsyncClient, async_session: AsyncSession
 ) -> None:
-    from hpao.services.alerts import acknowledge_alert, raise_alert
+    from lizzie.services.alerts import acknowledge_alert, raise_alert
 
     seeded = await _seed_school(async_session)
     await _sign_in(client)

@@ -6,7 +6,7 @@ import argparse
 
 import pytest
 
-from hpao.cli.dispatcher import main
+from lizzie.cli.dispatcher import main
 
 
 def test_main_accepts_no_arguments(monkeypatch: pytest.MonkeyPatch) -> None:

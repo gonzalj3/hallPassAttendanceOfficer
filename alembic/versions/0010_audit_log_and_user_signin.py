@@ -12,7 +12,7 @@ MVP-cut cleanup migration:
   every hall-pass mutation and every admin roster read; a future pilot
   upgrade enables FERPA disclosure logging without a schema change.
 
-DB-level renames (hpao -> lizzie) are NOT in this migration -- a database
+DB-level renames (lizzie -> lizzie) are NOT in this migration -- a database
 rename happens outside the migration chain (fresh ``CREATE DATABASE
 lizzie`` in docker-compose and Railway).
 """

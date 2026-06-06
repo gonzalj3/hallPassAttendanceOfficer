@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.services.hall_pass import HallPassValidationError, issue_pass
+from lizzie.services.hall_pass import HallPassValidationError, issue_pass
 
 
 async def test_issue_pass_rejects_invalid_destination() -> None:

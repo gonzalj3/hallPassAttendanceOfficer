@@ -11,11 +11,11 @@ from httpx import ASGITransport
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.api.admin import _get_session as _admin_get_session
-from hpao.api.frontend import _get_session as _frontend_get_session
-from hpao.app import make_app
-from hpao.auth.dependencies import _get_db_session as _auth_get_session
-from hpao.models import (
+from lizzie.api.admin import _get_session as _admin_get_session
+from lizzie.api.frontend import _get_session as _frontend_get_session
+from lizzie.app import make_app
+from lizzie.auth.dependencies import _get_db_session as _auth_get_session
+from lizzie.models import (
     Alert,
     AuditLog,
     Class,

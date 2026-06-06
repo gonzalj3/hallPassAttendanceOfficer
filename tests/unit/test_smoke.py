@@ -1,4 +1,4 @@
 def test_package_imports() -> None:
-    import hpao
+    import lizzie
 
-    assert hpao.__version__
+    assert lizzie.__version__

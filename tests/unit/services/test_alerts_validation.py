@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.services.alerts import (
+from lizzie.services.alerts import (
     AlertValidationError,
     _rule_key_for_overdue_pass,
     _severity_for_overdue_pass,

@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from hpao.realtime import (
+from lizzie.realtime import (
     HallpassIssued,
     HallpassReturned,
     InMemoryPublisher,

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from hpao.models import HALL_PASS_DESTINATIONS, HALL_PASS_STATUSES, HallPass
+from lizzie.models import HALL_PASS_DESTINATIONS, HALL_PASS_STATUSES, HallPass
 
 
 def test_hall_pass_construction() -> None:

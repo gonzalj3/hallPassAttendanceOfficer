@@ -31,7 +31,7 @@ FRONTEND_PORT="${FRONTEND_PORT:-3000}"
 DASHBOARD_PORT="${DASHBOARD_PORT:-3100}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 OPENAI_API_KEY_VALUE="${OPENAI_API_KEY:-}"
-DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://hpao:hpao@localhost:5432/hpao}"
+DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://lizzie:lizzie@localhost:5432/lizzie}"
 SAFETY_IDENTIFIER="${SAFETY_IDENTIFIER:-outbound-voice-agent-local}"
 # VITE_API_URL is read by the React frontend at build/dev time; defaults
 # to the backend port we just decided on. WS URL is auto-derived in
@@ -151,9 +151,9 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   (cd "$ROOT_DIR" && docker compose up -d --wait db)
   (cd "$ROOT_DIR" && "$VENV_DIR/bin/alembic" -c "$ROOT_DIR/alembic.ini" upgrade head)
   printf 'Seeding demo school + classes + students (idempotent)...\n'
-  (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m hpao.cli.seed)
+  (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m lizzie.cli.seed)
   printf 'Seeding Avery Johnson + 14 hall-pass history (idempotent)...\n'
-  (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m hpao.cli.seed_avery)
+  (cd "$ROOT_DIR" && "$VENV_DIR/bin/python" -m lizzie.cli.seed_avery)
   BACKEND_AVAILABLE=1
 else
   printf 'Docker is not running; skipping local Postgres + ABE backend startup. The Teacher Dashboard / Hall Pass iPad will fail their first /api/sessions fetch until you start Docker and re-run.\n'
@@ -170,7 +170,7 @@ npm_install_app "$VOICE_DIR" "Outbound Voice Agent"
 
 if [[ $BACKEND_AVAILABLE -eq 1 ]]; then
   printf 'Starting ABE backend (uvicorn) on port %s...\n' "$BACKEND_PORT"
-  (cd "$ROOT_DIR" && "$VENV_DIR/bin/uvicorn" --factory hpao.app:app_factory \
+  (cd "$ROOT_DIR" && "$VENV_DIR/bin/uvicorn" --factory lizzie.app:app_factory \
     --host 127.0.0.1 --port "$BACKEND_PORT") &
   PIDS+=("$!")
 fi

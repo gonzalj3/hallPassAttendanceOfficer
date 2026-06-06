@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from hpao.realtime import (
+from lizzie.realtime import (
     HallpassIssued,
     HallpassReturned,
     PgNotifyPublisher,

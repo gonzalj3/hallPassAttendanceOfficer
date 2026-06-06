@@ -1,4 +1,4 @@
-from hpao.realtime import asyncpg_dsn
+from lizzie.realtime import asyncpg_dsn
 
 
 class TestAsyncpgDsn:

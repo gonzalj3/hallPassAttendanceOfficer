@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from hpao.models import ALERT_SEVERITIES, ALERT_STATUSES, Alert
+from lizzie.models import ALERT_SEVERITIES, ALERT_STATUSES, Alert
 
 
 def test_alert_construction() -> None:

@@ -1,7 +1,7 @@
 from datetime import date
 from uuid import uuid4
 
-from hpao.models import GRADE_LEVELS, Student
+from lizzie.models import GRADE_LEVELS, Student
 
 
 def test_student_construction() -> None:

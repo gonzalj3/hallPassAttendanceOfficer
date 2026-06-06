@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from hpao.models import Class
+from lizzie.models import Class
 
 
 def test_class_construction() -> None:

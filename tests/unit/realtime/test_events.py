@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from hpao.realtime.events import (
+from lizzie.realtime.events import (
     AlertRaised,
     HallpassIssued,
     HallpassOverdue,

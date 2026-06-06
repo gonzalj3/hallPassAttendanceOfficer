@@ -7,9 +7,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Import Base and all models so target_metadata is fully populated.
-from hpao import models  # noqa: F401  (registers tables on Base.metadata)
-from hpao.config import Settings
-from hpao.db import Base
+from lizzie import models  # noqa: F401  (registers tables on Base.metadata)
+from lizzie.config import Settings
+from lizzie.db import Base
 
 config = context.config
 

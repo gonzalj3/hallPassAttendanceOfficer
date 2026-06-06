@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from hpao.cli.seed import SCHOOL_NAME, TEACHER_EMAIL, seed
-from hpao.models import Class, ClassEnrollment, ClassSession, School, Student, User
+from lizzie.cli.seed import SCHOOL_NAME, TEACHER_EMAIL, seed
+from lizzie.models import Class, ClassEnrollment, ClassSession, School, Student, User
 
 pytestmark = pytest.mark.integration
 
@@ -69,7 +69,9 @@ async def test_seed_adds_today_sessions_when_demo_school_already_exists(
     await seed(async_session)
 
     today_sessions = (
-        await async_session.execute(select(ClassSession).where(ClassSession.date == date.today()))
-    ).scalars().all()
+        (await async_session.execute(select(ClassSession).where(ClassSession.date == date.today())))
+        .scalars()
+        .all()
+    )
 
     assert len(today_sessions) == 3
