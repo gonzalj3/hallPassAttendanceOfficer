@@ -1,96 +1,134 @@
-# Hall Pass Attendance Officer (HPAO)
+# Monitor Lizzie
 
-Hackathon MVP. **Single school.** Backend + agent that owns attendance, hall passes, and policy compliance, and emits real-time alerts. End-to-end demo with a React/Vite frontend hitting the live backend over REST + WebSocket.
+Digital hall-pass tracker for K-12. Two views — teacher iPad + principal dashboard — backed by FastAPI and Postgres, deployed on Railway + Netlify. **Demo data only.** No real student PII.
 
-## Status (2026-05-09)
+## What this is
 
-| Area | State |
-|---|---|
-| Persistence: schools, students, users, classes, sessions, attendance, hall passes, alerts, agent_messages, policies | ✅ migrations 0001–0009 |
-| Attendance service (`record_attendance`, `list_*`) — idempotent upsert | ✅ |
-| Hall pass service (issue/check-in/overdue) + 15-min restroom default | ✅ |
-| Real-time `LISTEN/NOTIFY` + WebSocket fan-out | ✅ |
-| Policy ingestion + pgvector RAG + rule evaluator | ✅ |
-| Alerts service + `detect_overdue_passes` (the headline trigger) | ✅ |
-| Inter-agent boundary endpoints (HMAC-signed) | ✅ except `policy-search` + `excuses` (not yet exposed) |
-| Demo dispatcher loop (`detect → dispatch`) + CLI runner | ✅ |
-| OpenAI Codex agent loop wrapping the tool surface | ✅ |
-| **Top-level FastAPI app** — composes WS + agent boundary + browser REST + CORS | ✅ |
-| **Browser-facing REST surface** at `/api/*` (no HMAC, camelCase) | ✅ |
-| **Demo seed CLI** (`python -m hpao.cli.seed`) | ✅ |
-| **Frontend wired to backend** — Vite/React calls `/api/*`, subscribes via WebSocket | ✅ |
-| Audit log + observability hardening (Phase 9) | ⏭ optional, post-hackathon |
+A deterministic monitor for one specific question: *who is out of class and how long have they been gone?* Teachers issue digital passes from an iPad UI; a backend dispatcher detects overdue passes against a per-destination duration rule (15 min restroom default) and raises an alert; the principal dashboard renders alerts in real time over WebSocket.
 
-Test gate: 292 tests on `main`, full suite green. Pre-commit runs unit on commit, full suite on push.
+No LLM is called anywhere in the request path. No phone calls, no parent comms agent, no policy RAG. Those were in the hackathon version and were deliberately removed in the MVP scope-down (see `legacy/voice-agent` and `legacy/parent-comms-integration` branches if you need them).
 
 ## Quick start
 
-**Prerequisites** (full table with per-OS install hints in `README.md` → Prerequisites):
-
-| Tool | Version | Pinned in |
-|---|---|---|
-| Python | >= 3.12 | `pyproject.toml`, `.python-version`, `.tool-versions` |
-| Node.js | >= 20 | `frontend/package.json` engines, `outbound-voice-agent/package.json` engines, `.tool-versions` |
-| Docker (Engine 20.10+, Compose v2) | — | runtime requirement; not version-pinned in repo |
-| OpenAI API key | — | needed for Phase 5c embeddings + Phase 7 agent + Outbound Voice Agent; tests stub it |
-
 ```bash
 git clone <repo> && cd hallPassAttendanceOfficer
-make install          # python3 -m venv .venv && pip install -e ".[dev]" && pre-commit install
-make db-up            # docker compose up -d db (Postgres 16 + pgvector)
-.venv/bin/alembic upgrade head
-make test             # full suite (Docker required for integration)
+make install                                    # .venv + pip install -e ".[dev]" + pre-commit
+docker compose up -d db                         # Postgres 16 on :5432 (override to :5433 if collision)
+.venv/bin/alembic upgrade head                  # chain: 0001 → 0002 → 0004 → 0007 → 0009 → 0010
+.venv/bin/python -m lizzie.cli.seed             # Lincoln High + Ms. Rivera + Dr. Chen + 12 students
+.venv/bin/uvicorn --factory lizzie.app:app_factory --reload --port 8000
+
+# in another terminal — teacher iPad app
+cd frontend && npm install && npm run dev       # Vite on :3000
+
+# and another — principal dashboard
+cd frontend-dashboard && npm install && npm run dev    # Vite on :3100
 ```
 
-Make targets: `install` · `test` · `test-unit` · `test-integration` · `lint` · `fmt` · `type` · `db-up` · `db-down` · `hooks` · `clean`.
+Visit the iPad app at `http://localhost:3000/`, click the **Teacher** button → you're signed in as Ms. Rivera. The dashboard at `http://localhost:3100/` clicks **Principal** → signed in as Dr. Chen.
 
-Required env (or `.env`):
+## Required env
 
 | Var | Required | Default | Notes |
 |---|---|---|---|
-| `DATABASE_URL` | yes | — | `postgresql+asyncpg://hpao:hpao@localhost:5432/hpao` for local |
-| `APP_ENV` | no | `dev` | |
-| `PARENT_COMMS_URL` | for outbound webhooks | unset | Base URL of the teammate's parent-comms agent |
-| `PARENT_COMMS_SECRET` | for outbound webhooks | unset | Shared HMAC secret; must match parent-comms config |
-| `DISPATCHER_INTERVAL_SECONDS` | no | `30.0` | Drop to `5` for live demo |
-| `OPENAI_API_KEY` | for policy ingestion + agent loop | unset | Used by Phase 5c embeddings and the planned Phase 7 agent. Tests stub it out. |
-| `OPENAI_PROJECT_ID` | no | unset | Optional — pins API calls to a specific OpenAI project |
-| `OPENAI_MODEL` | no | `gpt-4o-mini` | Default chat model for the agent loop |
-| `OPENAI_EMBEDDING_MODEL` | no | `text-embedding-3-small` | Used by Phase 5c policy chunk embedding |
-| `FRONTEND_ORIGIN` | no | the deployed Netlify URL | CORS allow-list for the API. Comma-separate multiple origins. `http://localhost:*` is always allowed for dev. |
+| `DATABASE_URL` | yes | — | `postgresql+asyncpg://lizzie:lizzie@localhost:5432/lizzie` for local |
+| `APP_ENV` | no | `dev` | Set to `prod` so the session cookie picks up `Secure` + `SameSite=None` |
+| `SESSION_COOKIE_SECRET` | recommended | per-process random | Stable random ≥32 bytes; cookies survive a redeploy when set |
+| `DISPATCHER_INTERVAL_SECONDS` | no | `30.0` | Drop to `5` for a live demo |
+| `FRONTEND_ORIGIN` | no | the deployed Netlify URL | CORS allow-list. Comma-separate. `http://localhost:*` is always allowed via regex. |
 
-If `PARENT_COMMS_URL` / `_SECRET` are unset, the dispatcher still runs `detect_overdue_passes` (state hygiene) but skips outbound webhooks — useful when the teammate's agent isn't up.
+Frontend (Vite, baked at build time):
 
-## Run the full stack locally (frontend + backend)
+| Var | Default | Notes |
+|---|---|---|
+| `VITE_API_URL` | `http://localhost:8731` (teacher app) / `http://localhost:8000` (dashboard) | REST + WS base |
+
+## API surface
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `GET` | `/healthz` | none | Liveness |
+| `GET` | `/openapi.json`, `/docs` | none | Swagger |
+| `POST` | `/auth/role-pick` | none | Body: `{"role":"TEACHER"\|"ADMIN"}`. Sets `lizzie_session` cookie. |
+| `GET` | `/auth/me` | cookie | Current user, or 401 |
+| `POST` | `/auth/logout` | cookie | Clears cookie |
+| `GET` | `/api/sessions` | none | Today's class sessions |
+| `GET` | `/api/sessions/{id}/students` | none | Roster + active passes |
+| `POST` | `/api/hall-passes` | **TEACHER** | Issue. Writes `audit_log` row. |
+| `POST` | `/api/hall-passes/{id}/return` | **TEACHER** | Check-in. Writes `audit_log` row. |
+| `GET` | `/api/hall-passes` | none | List, optional `status_filter` / `session_id` |
+| `GET` | `/api/students/lookup` | none | First+last → student record |
+| `GET` | `/api/alerts` | none | Open / acknowledged / resolved |
+| `DELETE` | `/api/admin/students/{id}` | **ADMIN** | Cascade delete + audit row. Built for TEC §32.155 deletion-on-request. |
+| `WS` | `/v1/realtime?channel=…` | none | Multi-channel subscribe |
+
+Read endpoints aren't gated yet — only mutations and `/admin/*` require a session. The role-picker landing page is the UI-level gate.
+
+## Real-time events
+
+WebSocket fan-out over `/v1/realtime?channel=…`. Channels: `school:{id}` · `class:{id}` · `student:{id}`.
+
+Event types: `hallpass.issued` · `hallpass.returned` · `hallpass.overdue` · `alert.raised`.
+
+## Data model
+
+Every table has `id` (UUIDv4), `created_at`, `updated_at` (TIMESTAMPTZ) unless noted.
+
+| Table | Key fields | Notes |
+|---|---|---|
+| `schools` | `name`, `district` | |
+| `students` | `school_id` FK, `student_number`, `grade_level` | UNIQUE(`school_id`, `student_number`) |
+| `users` | `school_id` FK, `email`, `role`, `first_name`, `last_name`, `last_sign_in_at` | role ∈ TEACHER/ADMIN/COUNSELOR/NURSE |
+| `classes` | `school_id` FK, `teacher_id` FK, `name`, `period`, `room` | |
+| `class_enrollments` | `class_id`, `student_id`, `enrolled_at` | UNIQUE(class, student) |
+| `class_sessions` | `class_id` FK, `date`, `scheduled_start`, `scheduled_end` | UNIQUE(class, date) |
+| `hall_passes` | `student_id`, `originating_class_session_id`, `destination`, `checked_out_at`, `expected_return_at`, `checked_in_at`, `status`, `issued_by` | Partial UNIQUE(student) WHERE `status='ACTIVE'` |
+| `alerts` | `student_id`, `rule_key`, `severity`, `status`, `context` JSONB, `acknowledged_by` | Partial UNIQUE(student, rule_key) WHERE `status='OPEN'` |
+| `audit_log` | `user_id`, `actor_role`, `action`, `target_type`, `target_id?`, `context` JSONB, `occurred_at` | Append-only. FK on `user_id` ON DELETE SET NULL so audit records outlive a deleted user. |
+
+Enums:
+- `hall_pass.status`: `ACTIVE | RETURNED | OVERDUE | FLAGGED`
+- `hall_pass.destination`: `RESTROOM | NURSE | COUNSELOR | OFFICE | OTHER | HALLWAY | CLASSROOM`
+- `alert.severity`: `low | medium | high | critical`
+- `alert.status`: `OPEN | ACKNOWLEDGED | RESOLVED`
+
+## Auth model (demo)
+
+Two seeded identities (`Ms. Rivera` / `Dr. Chen`) created by `python -m lizzie.cli.seed`. The login screen on each frontend posts `{role: "TEACHER" \| "ADMIN"}` to `/auth/role-pick`; the backend resolves to the first user with that role, sets an HMAC-signed cookie, and downstream `current_user` / `require_role("ADMIN")` dependencies read the cookie.
+
+No password store. No Google SSO. When you pilot with a real district, swap the `current_user` function in `src/lizzie/auth/dependencies.py` for one that validates a Google OIDC ID token — every router stays the same.
+
+## Audit logging
+
+Every hall-pass mutation and every admin action writes an `audit_log` row through `lizzie.services.audit.write_audit`. The schema is deliberately FERPA-shaped (`actor_role`, `action`, `target_type`, `target_id`, `context` JSONB) so a future pilot can start requiring rows on read paths too without changing the schema.
+
+## Demo runbook (overdue restroom alert, end-to-end)
 
 ```bash
-make db-up                                          # Postgres 16 + pgvector
-.venv/bin/alembic upgrade head                      # schema (0001-0009)
-.venv/bin/python -m hpao.cli.seed                   # demo school + 3 classes + 12 students (idempotent)
-.venv/bin/uvicorn --factory hpao.app:app_factory --reload --port 8000
-
-# in another terminal
-cd frontend && npm install && npm run dev           # Vite at http://localhost:3000
+# Terminal 1 — dispatcher loop
+DATABASE_URL=postgresql+asyncpg://lizzie:lizzie@localhost:5432/lizzie \
+DISPATCHER_INTERVAL_SECONDS=5 \
+  python -m lizzie.cli.dispatcher
 ```
 
-The backend exposes:
-- `GET  /healthz`                                    — liveness
-- `GET  /openapi.json` · `/docs`                     — Swagger UI
-- `GET  /api/sessions`                               — today's class sessions
-- `GET  /api/sessions/{id}/students`                 — roster + active passes
-- `POST /api/hall-passes`                            — issue (teacher inferred from session)
-- `POST /api/hall-passes/{id}/return`                — check-in
-- `GET  /api/hall-passes`                            — list, optional `status_filter` / `session_id` query
-- `WS   /v1/realtime?channel=…`                      — Phase 4c fan-out
-- `POST /v1/agent/inbound/parent-message` (HMAC)     — Phase 8 inter-agent
-- `POST /v1/agent/inbound/parent-response` (HMAC)
-- `GET  /v1/agent/student-context/{id}` (HMAC)
+```bash
+# Terminal 2 — issue a 1-min pass via the iPad app or REPL
+from lizzie.services.hall_pass import issue_pass
+await issue_pass(
+    db,
+    student_id=student.id,
+    originating_class_session_id=session.id,
+    destination="RESTROOM",
+    issued_by=teacher.id,
+    duration_minutes=1,                              # tripped within ~1 min
+)
+```
 
-CORS: `FRONTEND_ORIGIN` (defaults to the deployed Netlify URL) plus any `http://localhost:*` are always allowed.
+Within `DISPATCHER_INTERVAL_SECONDS` of the pass going overdue, Terminal 1 logs the alert raised. The dashboard's WebSocket subscription receives `alert.raised` and the alert appears in the Live Activity panel.
 
-### Local port collisions
+## Local port collisions
 
-If your machine already has Postgres on 5432 (homebrew etc.), drop a local-only `docker-compose.override.yml` (already gitignored) to remap to 5433 and update `.env`:
+If the host has Postgres on 5432 already, the gitignored `docker-compose.override.yml` remaps to 5433:
 
 ```yaml
 services:
@@ -100,204 +138,40 @@ services:
 ```
 
 ```bash
-DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5433/hpao
+DATABASE_URL=postgresql+asyncpg://lizzie:lizzie@localhost:5433/lizzie
 ```
 
 Same idea for the API port — pass `--port 8765` (or whatever's free) and set `VITE_API_URL=http://localhost:8765` in `frontend/.env.local`.
 
-### Frontend env vars
-
-| Var | Default | Notes |
-|---|---|---|
-| `VITE_API_URL` | `http://localhost:8731` | REST base. Override on Netlify dashboard for deploys. |
-| `VITE_WS_URL` | derived from `VITE_API_URL` (`http` → `ws`) | Use `wss://` when frontend is HTTPS. |
-
-## Demo runbook (the 15-min restroom flow, end-to-end)
-
-Two terminals.
-
-**Terminal 1 — dispatcher loop:**
-```bash
-DATABASE_URL=postgresql+asyncpg://hpao:hpao@localhost:5432/hpao \
-PARENT_COMMS_URL=https://your-teammate-agent.example \
-PARENT_COMMS_SECRET=shared-hmac-secret \
-DISPATCHER_INTERVAL_SECONDS=5 \
-  python -m hpao.cli.dispatcher
-```
-
-CLI flags: `--once` (single cycle, prints summary, exits) · `--interval N` (override loop interval).
-
-**Terminal 2 — issue a hall pass that will trip the alert:**
-```python
-# in a python REPL or seed script
-from hpao.services.hall_pass import issue_pass
-await issue_pass(
-    db,
-    student_id=student.id,
-    originating_class_session_id=session.id,
-    destination="RESTROOM",
-    issued_by=teacher.id,
-    duration_minutes=1,  # 1 min for fast demo (default is 15)
-)
-```
-
-Within `DISPATCHER_INTERVAL_SECONDS` of the pass going overdue, Terminal 1 logs the alert raised + webhook fired. The `agent_messages` table will have `direction=OUTBOUND`, `status=SENT`, `alert_id=<the alert>`.
-
-The signed payload that lands at the teammate's `/notifications`:
-
-```json
-{
-  "correlation_id": "uuid",
-  "event": "alert.raised",
-  "severity": "high",
-  "student_id": "uuid",
-  "guardians": [],
-  "context": {
-    "rule_key": "hallpass.restroom.duration_exceeded",
-    "summary": "Student out of class 17 min (restroom)",
-    "evidence": { "hall_pass_id": "...", "destination": "RESTROOM", "minutes_elapsed": 17 }
-  },
-  "intent": "notify"
-}
-```
-
-Header: `X-HPAO-Signature: hex(hmac_sha256(PARENT_COMMS_SECRET, raw_body))`.
-
-### Talking to the OpenAI agent ad-hoc
-
-For investigating student state via an LLM (Phase 7):
-
-```bash
-OPENAI_API_KEY=... \
-DATABASE_URL=... \
-  python -m hpao.cli.agent "How many days has student S00042 been absent this semester?"
-```
-
-The agent has tools for: `lookup_student_by_number`, `get_student_attendance`, `get_active_hall_pass`, `get_open_alerts_for_student`, `query_policy`, `record_attendance_as_agent`, `raise_alert_for_student`, `dispatch_pending_alerts`. It will call them and respond with a terse staff-facing summary.
-
-## What HPAO is (and isn't)
-
-- **Owns**: schools, classes, students, teachers, attendance, hall passes, policy rules, alerts, agent-message log.
-- **Does**: records attendance, tracks hall-pass check-out/check-in, evaluates deterministic policy rules, raises real-time alerts (e.g. restroom > 15 min → on-duty admin).
-- **Is not**: parent communications, dashboard UIs, SSO/identity, SIS sync.
-
-## Directionality
-
-HPAO sits on the **agent boundary** (HTTPS between services), not the **parent boundary** (SMS/email/phone). It is bidirectional on the agent boundary but **receive-only** at the parent boundary — HPAO never originates a parent-facing message and ships no Twilio/SMTP/phone client.
-
-- HPAO emits **structured intents** (`rule_key`, `severity`, `evidence`, `intent` enum), never message bodies.
-- The parent-comms agent owns wording, language, channel selection, opt-outs, quiet hours.
-- `agent_messages` is a log of intents and decisions — actual SMS/email transcripts live in parent-comms.
-- Tests assert webhook payload shape, not message content; HPAO authors no parent-facing copy.
-
-## Boundary with the parent-comms agent (teammate)
-
-The parent-comms agent **initiates and receives** all parent/admin conversations. HPAO never contacts parents directly. All boundary calls are HMAC-signed (`X-HPAO-Signature: hex(hmac_sha256(secret, body))`) and idempotent on `correlation_id`.
-
-### HPAO → parent-comms (outbound webhook) ✅ implemented
-
-`POST {parent_comms_base}/notifications` — payload shape shown in **Demo runbook** above.
-
-### parent-comms → HPAO (HPAO exposes)
-
-| Method | Path | State |
-|---|---|---|
-| `POST` | `/v1/agent/inbound/parent-message` | ✅ implemented |
-| `POST` | `/v1/agent/inbound/parent-response` | ✅ implemented |
-| `GET`  | `/v1/agent/student-context/{student_id}?since=YYYY-MM-DD` | ✅ implemented |
-| `GET`  | `/v1/agent/policy-search?q=...` | 🚧 service exists (Phase 5c), HTTP endpoint not yet exposed |
-| `POST` | `/v1/agent/excuses` | 🚧 not yet implemented |
-
-POSTs return `{accepted, agent_message_id, correlation_id, duplicate}`. Same `correlation_id` posted twice → `duplicate=true`, no double-write.
-
-`student-context` returns `{student_id, student_number, grade_level, first_name, last_name, school_id, attendance_summary, active_hall_passes[], open_alerts[]}`.
-
-## Real-time events
-
-Delivered via WebSocket at `/v1/realtime?channel=...` (multi-channel subscribe) and outbound webhook (parent-comms, severity ≥ medium).
-
-Channels: `school:{id}` · `class:{id}` · `student:{id}`.
-
-Event types:
-- `attendance.recorded`
-- `hallpass.issued`
-- `hallpass.returned`
-- `hallpass.overdue` — fires when `now > expected_return_at` (default 15 min for restroom, configurable per destination)
-- `alert.raised`
-
-## Data model (essentials)
-
-Every table has `id` (UUIDv4), `created_at`, `updated_at` (TIMESTAMPTZ).
-
-| Table | Key fields | Notes |
-|---|---|---|
-| `schools` | `name`, `district` | |
-| `students` | `school_id` FK, `student_number`, `grade_level` | UNIQUE(`school_id`, `student_number`) |
-| `users` | `school_id` FK, `email`, `role`, `first_name`, `last_name` | role ∈ TEACHER/ADMIN/COUNSELOR/NURSE |
-| `classes` | `school_id` FK, `teacher_id` FK, `name`, `period`, `room` | |
-| `class_enrollments` | `class_id`, `student_id`, `enrolled_at` | UNIQUE(class, student) |
-| `class_sessions` | `class_id` FK, `date`, `scheduled_start`, `scheduled_end` | UNIQUE(class, date) |
-| `attendance_records` | `class_session_id` FK, `student_id` FK, `status`, `source`, `recorded_by`, `notes` | UNIQUE(session, student) |
-| `hall_passes` | `student_id`, `originating_class_session_id`, `destination`, `checked_out_at`, `expected_return_at`, `checked_in_at`, `status`, `issued_by` | Partial UNIQUE(student) WHERE `status='ACTIVE'` |
-| `policies` / `policy_chunks` / `policy_rules` | RAG corpus + structured rule expressions | pgvector embeddings on chunks |
-| `alerts` | `student_id`, `rule_key`, `severity`, `status`, `context` JSONB, `acknowledged_by` | Partial UNIQUE(student, rule_key) WHERE `status='OPEN'` |
-| `agent_messages` | `direction`, `counterparty`, `correlation_id`, `student_id?`, `alert_id?`, `payload` JSONB, `status` | UNIQUE(direction, correlation_id) |
-
-`guardians` / `student_guardians` — **not built**; parent-comms owns guardian state. HPAO references guardians only as opaque IDs in payloads.
-
-Enums:
-- `attendance.status`: `PRESENT | ABSENT | TARDY | EXCUSED | UNEXCUSED`
-- `attendance.source`: `TEACHER | AGENT | IMPORT`
-- `hall_pass.status`: `ACTIVE | RETURNED | OVERDUE | FLAGGED`
-- `hall_pass.destination`: `RESTROOM | NURSE | COUNSELOR | OFFICE | OTHER | HALLWAY | CLASSROOM` (HALLWAY + CLASSROOM added in migration 0009 to match the frontend's destination set)
-- `alert.severity`: `low | medium | high | critical`
-- `alert.status`: `OPEN | ACKNOWLEDGED | RESOLVED`
-- `agent_message.direction`: `INBOUND | OUTBOUND`
-- `agent_message.status`: `PENDING | SENT | FAILED | RECEIVED`
-
-## Policy engine (hybrid)
-
-1. **Deterministic rules** — evaluated on relevant writes + nightly batch. Seed set:
-   - `tea.compulsory_attendance.90_percent` — TEC §25.092, attend ≥ 90% of days offered.
-   - `tea.truancy.unexcused_absences` — 3 unexcused in 4-week window or 10 in 6 months.
-   - `pfisd.18_day_max` — alert at 15 absences (configurable threshold).
-   - `hallpass.<destination>.duration_exceeded` — `hall_pass` open past `expected_return_at`. RESTROOM = severity `high`, others = `medium`.
-2. **RAG** over policy docs for nuance (e.g. exemption eligibility under TEC §25.087). **Advisory only** — cannot override deterministic outcomes.
-
 ## Stack
 
 - Python 3.12, FastAPI, SQLAlchemy 2.0 async, Alembic, Pydantic v2
-- PostgreSQL 16 + pgvector; real-time via `LISTEN/NOTIFY` → WebSockets
-- **Agents run on OpenAI (hackathon Codex credits)** — Agents SDK / Responses API with function calling. Not Anthropic.
-- pytest (unit + integration via testcontainers + contract + e2e), ruff (lint + format), mypy
-- pre-commit hooks: fast unit tests on commit; full suite on push; CI mirrors push
+- PostgreSQL 16 (plain, no pgvector); real-time via `LISTEN/NOTIFY` → WebSockets
+- React 18 + Vite for both frontends; Tailwind; React Router on the teacher app
+- pytest (unit + integration via testcontainers), ruff (lint + format), mypy strict
+- pre-commit: unit on commit, full suite on push
 
 ## Conventions
 
-- IDs: UUIDv4 (UUIDv7 deferred — not in stdlib for our `>=3.12` floor).
-- Times: UTC ISO-8601 in payloads; school-local time stored on session records.
-- All POSTs accept `Idempotency-Key` header; boundary endpoints additionally key off `correlation_id`.
-- Errors: RFC 7807 `application/problem+json`.
-- Auth between services: HMAC-SHA256 over raw body (`X-HPAO-Signature`).
-
-## Out of scope (hackathon)
-
-SSO, SIS sync, multi-tenant, mobile UIs, push notifications, parent-facing UX (teammate's agent owns it), teacher dashboard UI (other coworkers).
+- IDs: UUIDv4
+- Times: UTC ISO-8601 in payloads; school-local times stored on session records
+- Errors: FastAPI default JSON envelope
+- Auth: HMAC-signed cookie (`lizzie_session`), `SameSite=None;Secure` in prod, `Lax` in dev
+- Cookie secret: `SESSION_COOKIE_SECRET`. Unset = per-process random (dev only)
 
 ## Pointers
 
-- **Plan + status**: `PLAN.md` (living doc, also tracks per-phase completion).
-- **Migrations**: `alembic/versions/` (0001–0009 currently).
-- **Top-level app factory**: `src/hpao/app.py` (`make_app(database_url, ...)` and `app_factory()` for `uvicorn --factory`).
-- **Domain models**: `src/hpao/models/`.
-- **Services** (DB I/O, business logic): `src/hpao/services/` — `attendance.py`, `hall_pass.py`, `alerts.py`, `agent_messages.py`, `dispatcher.py`.
-- **API routers**: `src/hpao/api/agent.py` (HMAC boundary), `src/hpao/api/frontend.py` (browser-facing REST), `src/hpao/realtime/` (WebSocket).
-- **Outbound HTTP client**: `src/hpao/integrations/parent_comms.py`.
-- **Boundary schemas (Pydantic)**: `src/hpao/schemas/agent.py` (HMAC), `src/hpao/schemas/frontend.py` (camelCase REST).
-- **HMAC sign/verify**: `src/hpao/api/security.py`.
+- **Top-level app factory**: `src/lizzie/app.py` — `make_app(database_url, session_secret=..., is_production=...)` and `app_factory()` for `uvicorn --factory`
+- **Domain models**: `src/lizzie/models/`
+- **Services**: `src/lizzie/services/` — `hall_pass.py`, `alerts.py`, `audit.py`, `dispatcher.py`
+- **API routers**: `src/lizzie/api/frontend.py` (browser REST), `src/lizzie/api/admin.py` (DELETE student), `src/lizzie/realtime/websocket.py` (WS)
+- **Auth**: `src/lizzie/auth/` — `session.py` (sign/verify), `dependencies.py` (`current_user`, `require_role`), `router.py` (`/auth/*`)
+- **Frontends**: `frontend/` (teacher iPad), `frontend-dashboard/` (principal). Each has its own `netlify.toml` + Tailwind config.
 - **CLIs**:
-  - `python -m hpao.cli.dispatcher` — periodic overdue-pass detector
-  - `python -m hpao.cli.agent "..."` — Phase 7 OpenAI agent loop
-  - `python -m hpao.cli.seed` — demo data (idempotent)
-- **Frontend** (React/Vite): `frontend/src/` with `api/{client,types,realtime}.ts` providing typed fetch wrappers + `useRealtime` hook. Deploys to Netlify via `netlify.toml`.
-- **OpenAPI**: `/openapi.json` once `app_factory` is running.
+  - `python -m lizzie.cli.dispatcher` — periodic overdue-pass detector
+  - `python -m lizzie.cli.seed` — Lincoln High + Ms. Rivera + Dr. Chen + 12 students (idempotent)
+- **OpenAPI**: `/openapi.json` and `/docs` once the app is running
+
+## Out of scope
+
+Real student PII, multi-tenant, SSO, SIS sync, mobile native apps, parent communications, AI/LLM features, voice/phone integration. None of those land in the MVP. The architecture (role-picker behind `current_user`, audit-log column shape) is deliberately built so the pilot upgrade for any of them is a config switch, not a rewrite.

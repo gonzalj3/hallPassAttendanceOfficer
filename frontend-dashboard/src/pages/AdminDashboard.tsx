@@ -167,7 +167,6 @@ export default function AdminDashboard() {
               <ClassroomVolumeCard volume={classroomVolume} range={range} />
               <HourlyChartCard range={range} />
               <FrequentFlyersCard students={topStudents} range={range} />
-              <VoiceCallsCard calls={data.voiceCalls} />
             </div>
           </>
         )}
@@ -189,7 +188,7 @@ export default function AdminDashboard() {
           <AttendancePage classRosters={data.classRosters} />
         )}
         {section === 'alerts' && (
-          <AlertsPage alerts={data.alerts} voiceCalls={data.voiceCalls} />
+          <AlertsPage alerts={data.alerts} voiceCalls={[]} />
         )}
       </main>
     </div>
@@ -1210,133 +1209,6 @@ function CountTile({
       >
         {value}
       </div>
-    </div>
-  );
-}
-
-function VoiceCallsCard({ calls }: { calls: VoiceCallSummaryApi[] }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [transcript, setTranscript] = useState<TranscriptTurnApi[]>([]);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
-
-  const toggle = async (id: string) => {
-    if (expandedId === id) {
-      setExpandedId(null);
-      setTranscript([]);
-      return;
-    }
-    setExpandedId(id);
-    setLoadingId(id);
-    try {
-      const detail = await getVoiceCall(id);
-      setTranscript(detail.transcript ?? []);
-    } catch {
-      setTranscript([]);
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const recent = calls.slice(0, 5);
-
-  return (
-    <div className="col-span-12 bg-white border border-[#eff5f5] rounded-xl p-5 shadow-sm">
-      <div className="flex items-baseline justify-between mb-3">
-        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
-          📞 Recent Guardian Calls
-        </h3>
-        <span className="text-xs text-[#6d797b]">
-          {calls.length} total · live updates from voice agent
-        </span>
-      </div>
-      {recent.length === 0 ? (
-        <p className="text-sm text-[#6d797b]">
-          No voice-agent conversations yet. Start one in the outbound voice
-          agent and it will land here within a second.
-        </p>
-      ) : (
-        <ul className="divide-y divide-[#eff5f5]">
-          {recent.map(c => {
-            const open = expandedId === c.id;
-            return (
-              <li key={c.id} className="py-3">
-                <button
-                  type="button"
-                  onClick={() => void toggle(c.id)}
-                  className="w-full text-left flex items-start gap-3 hover:bg-[#f7f9f9] p-2 rounded-lg transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-semibold text-sm">
-                        {c.studentName}
-                      </span>
-                      <span className="text-[10px] uppercase tracking-wide bg-[#eff5f5] text-[#3d494a] px-1.5 py-0.5 rounded">
-                        {c.scenario}
-                      </span>
-                      {c.parentConfirmed === true && (
-                        <span className="text-[10px] uppercase tracking-wide bg-[#dff5f6] text-[#00666e] px-1.5 py-0.5 rounded">
-                          confirmed
-                        </span>
-                      )}
-                      {c.alertId && (
-                        <span className="text-[10px] uppercase tracking-wide bg-[#fef3e2] text-[#b27800] px-1.5 py-0.5 rounded">
-                          alert-driven
-                        </span>
-                      )}
-                    </div>
-                    {c.excuseSummary && (
-                      <p className="text-sm text-[#3d494a] truncate">
-                        {c.excuseSummary}
-                      </p>
-                    )}
-                    <p className="text-xs text-[#6d797b] mt-0.5">
-                      {new Date(c.callEndedAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {c.language && ` · ${c.language}`}
-                    </p>
-                  </div>
-                  <span className="text-xs text-[#6d797b] mt-2 select-none">
-                    {open ? '▾' : '▸'}
-                  </span>
-                </button>
-                {open && (
-                  <div className="mt-2 ml-2 pl-3 border-l-2 border-[#eff5f5]">
-                    {loadingId === c.id ? (
-                      <p className="text-xs text-[#6d797b] py-2">
-                        Loading transcript…
-                      </p>
-                    ) : transcript.length === 0 ? (
-                      <p className="text-xs text-[#6d797b] py-2">
-                        Voice agent didn&apos;t persist a transcript for this
-                        call.
-                      </p>
-                    ) : (
-                      <ul className="space-y-1.5 py-2">
-                        {transcript.map((t, i) => (
-                          <li key={i} className="text-sm">
-                            <span
-                              className={`inline-block min-w-[70px] mr-2 text-[10px] uppercase font-bold tracking-wide ${
-                                t.speaker === 'agent'
-                                  ? 'text-[#00666e]'
-                                  : 'text-[#3d494a]'
-                              }`}
-                            >
-                              {t.speaker}
-                            </span>
-                            <span className="text-[#171d1e]">{t.text}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
     </div>
   );
 }
