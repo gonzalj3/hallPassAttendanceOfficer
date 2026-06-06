@@ -1,8 +1,20 @@
 // Role-picker auth: signs in as the seeded demo Teacher or Principal
 // and stores the session in an HttpOnly cookie set by the backend.
+// API_BASE matches client.ts: relative in prod (Netlify proxy makes
+// the cookie first-party), localhost:8000 in dev.
+
+function defaultApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+  }
+  return '';
+}
 
 const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8731';
+  (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiBase();
 
 export type DemoRole = 'TEACHER' | 'ADMIN';
 

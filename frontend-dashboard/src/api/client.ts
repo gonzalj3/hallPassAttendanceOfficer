@@ -9,8 +9,21 @@ import type {
   VoiceCallSummaryApi,
 } from './types';
 
+// In production: relative URLs through the Netlify proxy so the
+// session cookie is first-party on the Netlify origin. In dev: hit
+// the FastAPI process directly on localhost:8000.
+function defaultApiBase(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+  }
+  return '';
+}
+
 const API_BASE: string =
-  (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+  (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiBase();
 
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {

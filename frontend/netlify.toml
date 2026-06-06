@@ -1,20 +1,39 @@
-# Netlify build config for the React/Vite iPad / teacher frontend
-# in /frontend. The Netlify project must have its base directory
-# set to `frontend` in the UI; Netlify then reads this file from
-# the base directory. Set VITE_API_URL / VITE_WS_URL in the
-# project env to point at the Railway backend.
+# Netlify build config for the teacher iPad app (frontend/).
+# Set base directory to `frontend` in the Netlify UI.
 
 [build]
   publish = "dist"
   command = "npm ci && npm run build"
 
 [build.environment]
-  # Vite 5 needs Node 18+. Pinned to 20 LTS for predictable builds.
   NODE_VERSION = "20"
 
-# Single-page app fallback: any path that isn't a real file in /dist
-# falls through to index.html so react-router-dom handles the route
-# on the client. Without this, hitting /classes directly would 404.
+# Proxy /auth/*, /api/*, and /v1/* to the Railway backend so the
+# session cookie is set on the Netlify origin (first-party). Without
+# this, browsers block the cookie as third-party (Safari ITP, Chrome
+# privacy sandbox) and sign-in loops back to the login screen.
+#
+# `force = true` makes the redirect run even when there is a matching
+# static file (there shouldn't be at these paths, but defensive).
+[[redirects]]
+  from = "/auth/*"
+  to = "https://hpao-backend-production.up.railway.app/auth/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://hpao-backend-production.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/*"
+  to = "https://hpao-backend-production.up.railway.app/v1/:splat"
+  status = 200
+  force = true
+
+# SPA fallback last -- catches everything else and serves index.html.
 [[redirects]]
   from = "/*"
   to = "/index.html"

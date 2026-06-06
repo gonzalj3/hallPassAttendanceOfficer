@@ -1,9 +1,5 @@
-# Netlify build config for the principal/admin dashboard frontend
-# in /frontend-dashboard. Create this as a SECOND Netlify site
-# pointing at the same GitHub repo, with base directory set to
-# `frontend-dashboard` in the Netlify UI -- Netlify will pick this
-# file up automatically. Set VITE_API_URL / VITE_WS_URL in the
-# dashboard env to point at the Railway backend.
+# Netlify build config for the principal dashboard (frontend-dashboard/).
+# Set base directory to `frontend-dashboard` in the Netlify UI.
 
 [build]
   publish = "dist"
@@ -12,8 +8,27 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA fallback: any path that isn't a real file falls through to
-# index.html so client-side routing handles it.
+# Proxy /auth/*, /api/*, /v1/* to the Railway backend so the session
+# cookie lives on the Netlify origin (first-party). See the teacher
+# frontend's netlify.toml for the longer explanation.
+[[redirects]]
+  from = "/auth/*"
+  to = "https://hpao-backend-production.up.railway.app/auth/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://hpao-backend-production.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/v1/*"
+  to = "https://hpao-backend-production.up.railway.app/v1/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

@@ -8,8 +8,19 @@ import type { RealtimeEnvelope } from './types';
 function deriveWsBase(): string {
   const explicit = import.meta.env.VITE_WS_URL as string | undefined;
   if (explicit) return explicit;
-  const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8731';
-  return apiBase.replace(/^http/, 'ws');
+  const apiBase = import.meta.env.VITE_API_URL as string | undefined;
+  if (apiBase) return apiBase.replace(/^http/, 'ws');
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'ws://localhost:8000';
+    }
+    // Production: WebSocket goes to the same origin and is proxied
+    // through netlify.toml's /v1/* redirect to the Railway backend.
+    const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    return `${scheme}://${window.location.host}`;
+  }
+  return '';
 }
 
 const WS_BASE = deriveWsBase();
