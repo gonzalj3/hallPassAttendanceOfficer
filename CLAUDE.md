@@ -159,6 +159,17 @@ Same idea for the API port — pass `--port 8765` (or whatever's free) and set `
 - Auth: HMAC-signed cookie (`lizzie_session`), `SameSite=None;Secure` in prod, `Lax` in dev
 - Cookie secret: `SESSION_COOKIE_SECRET`. Unset = per-process random (dev only)
 
+## Deploy economy (Netlify free tier)
+
+Netlify free tier is **315 build credits per month**. Each production deploy costs **15 credits**, and we have **two** Netlify sites (teacher iPad + principal dashboard), so **every push to `main` that changes frontend code costs 30 credits**. That's a ceiling of ~10 frontend pushes per month before Netlify silently disables builds for the rest of the cycle (the deploy log shows "error" with no message; first sign is that the deployed bundle hash stops moving).
+
+**Rules for frontend changes:**
+
+- **Batch aggressively.** Multiple small commits locally are fine — they're free. Push to `main` only when the bundle of changes is meaningfully complete. If more than one frontend tweak is queued for the same session, hold the push and bundle them.
+- **Backend-only commits don't cost Netlify credits.** Anything that only touches `src/lizzie/**`, `tests/**`, `alembic/**`, `pyproject.toml`, `railway.json`, or `Dockerfile` can be pushed freely.
+- **When chasing a UI bug, fix as much as you can see before pushing.** It's cheaper to ship a broader fix once than to ship five "one more thing" pushes.
+- **If a Netlify deploy is failing for unclear reasons, check the credit balance before debugging the build.** Quota exhaustion looks identical to a build error in the public API.
+
 ## Pointers
 
 - **Top-level app factory**: `src/lizzie/app.py` — `make_app(database_url, session_secret=..., is_production=...)` and `app_factory()` for `uvicorn --factory`

@@ -24,6 +24,25 @@ related area is open in front of you anyway.
 
 ## Deployment / infra
 
+### Netlify free-tier credit budget
+- **What:** Netlify free tier = **315 build credits per month**, each
+  production deploy = **15 credits**, with **two** Netlify sites
+  (teacher iPad + principal dashboard) = **30 credits per `git push origin
+  main`** that touches frontend code. Ceiling: ~10 frontend pushes per
+  cycle before builds get silently disabled.
+- **First time this bit us:** 2026-06-07. After a long string of small
+  commits (KPI wiring, mock-data removal, netlify.toml restoration),
+  the budget ran out. Builds started failing with no error message in
+  the public API; the deployed bundle hash stopped advancing. Both
+  Netlify sites and the GitHub Actions ruff check happened to be
+  failing concurrently, which masked the real cause.
+- **How to avoid:** batch frontend commits locally and only push when
+  a meaningful chunk of work is ready. See CLAUDE.md → "Deploy economy"
+  for the rules. Backend-only commits are free of Netlify cost.
+- **How to detect:** if a Netlify deploy is failing for unclear
+  reasons, check the team's credit balance at
+  https://app.netlify.com/teams/ before debugging the build.
+
 ### Railway URL still says `hpao-backend-production`
 - **What:** the service was renamed to `monitor-lizzie-backend` in the
   dashboard, but the auto-generated `*.up.railway.app` URL is pinned at
