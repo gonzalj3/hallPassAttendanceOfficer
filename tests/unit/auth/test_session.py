@@ -16,7 +16,7 @@ def test_round_trips_payload() -> None:
 
 def test_rejects_tampered_body() -> None:
     token = sign_session({"role": "TEACHER"}, secret=SECRET, now=1000)
-    body, sig = token.split(".", 1)
+    _body, sig = token.split(".", 1)
     # Re-encode the body with role flipped; the sig no longer matches.
     import base64
     import json
