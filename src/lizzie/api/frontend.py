@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date, datetime, time
 from typing import Annotated, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, status
 from sqlalchemy import func, select
@@ -35,6 +35,8 @@ from lizzie.models import (
     HallPass,
     Student,
 )
+from lizzie.realtime.events import HallpassIssued, HallpassReturned
+from lizzie.realtime.postgres import PgNotifyPublisher
 from lizzie.schemas.frontend import (
     AlertStatusLiteral,
     AlertSummaryOut,
@@ -265,6 +267,22 @@ async def issue_hall_pass(
             "destination": hp.destination,
         },
     )
+    # pg_notify queues until COMMIT, so the dashboard sees a hallpass.issued
+    # event the instant the row becomes visible to its own polling queries.
+    issued_event = HallpassIssued(
+        event_id=uuid4(),
+        occurred_at=hp.checked_out_at,
+        school_id=cls.school_id,
+        student_id=hp.student_id,
+        hall_pass_id=hp.id,
+        class_id=cls.id,
+        class_session_id=session.id,
+        destination=hp.destination,
+        expected_return_at=hp.expected_return_at,
+        issued_by=cls.teacher_id,
+    )
+    await PgNotifyPublisher(await db.connection()).publish(issued_event)
+
     return await _hall_pass_to_out(db, hp)
 
 
@@ -287,6 +305,23 @@ async def return_hall_pass(pass_id: UUID, db: SessionDep, actor: CurrentUserDep)
         target_id=hp.id,
         context={"student_id": str(hp.student_id)},
     )
+
+    # Resolve school + class so the realtime event fans out to the same
+    # channels the dashboard subscribed to on issue.
+    session = await db.get(ClassSession, hp.originating_class_session_id)
+    cls = await db.get(Class, session.class_id) if session else None
+    if cls is not None and hp.checked_in_at is not None:
+        returned_event = HallpassReturned(
+            event_id=uuid4(),
+            occurred_at=hp.checked_in_at,
+            school_id=cls.school_id,
+            student_id=hp.student_id,
+            hall_pass_id=hp.id,
+            class_id=cls.id,
+            checked_in_at=hp.checked_in_at,
+        )
+        await PgNotifyPublisher(await db.connection()).publish(returned_event)
+
     return await _hall_pass_to_out(db, hp)
 
 
