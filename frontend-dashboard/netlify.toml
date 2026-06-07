@@ -1,5 +1,5 @@
 # Netlify build config for the principal dashboard (frontend-dashboard/).
-# Set base directory to `frontend-dashboard` in the Netlify UI.
+# The Netlify site has base directory set to `frontend-dashboard` in the UI.
 
 [build]
   publish = "dist"
@@ -8,9 +8,9 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Proxy /auth/*, /api/*, /v1/* to the Railway backend so the session
-# cookie lives on the Netlify origin (first-party). See the teacher
-# frontend's netlify.toml for the longer explanation.
+# Proxy backend routes to Railway so the lizzie_session cookie is
+# first-party on the Netlify origin. See the teacher app's
+# netlify.toml for the longer explanation.
 [[redirects]]
   from = "/auth/*"
   to = "https://hpao-backend-production.up.railway.app/auth/:splat"

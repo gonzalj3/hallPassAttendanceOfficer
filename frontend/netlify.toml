@@ -1,5 +1,5 @@
 # Netlify build config for the teacher iPad app (frontend/).
-# Set base directory to `frontend` in the Netlify UI.
+# The Netlify site has base directory set to `frontend` in the UI.
 
 [build]
   publish = "dist"
@@ -8,13 +8,10 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Proxy /auth/*, /api/*, and /v1/* to the Railway backend so the
-# session cookie is set on the Netlify origin (first-party). Without
-# this, browsers block the cookie as third-party (Safari ITP, Chrome
-# privacy sandbox) and sign-in loops back to the login screen.
-#
-# `force = true` makes the redirect run even when there is a matching
-# static file (there shouldn't be at these paths, but defensive).
+# Proxy /auth/*, /api/*, /v1/* to the Railway backend so the session
+# cookie is set on the Netlify origin (first-party). Without these,
+# browsers block the cookie as third-party (Safari ITP, Chrome privacy
+# sandbox) and sign-in loops back to the login screen.
 [[redirects]]
   from = "/auth/*"
   to = "https://hpao-backend-production.up.railway.app/auth/:splat"
@@ -33,7 +30,7 @@
   status = 200
   force = true
 
-# SPA fallback last -- catches everything else and serves index.html.
+# SPA fallback last — catches everything else and serves index.html.
 [[redirects]]
   from = "/*"
   to = "/index.html"
