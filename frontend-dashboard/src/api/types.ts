@@ -79,6 +79,17 @@ export interface VoiceCallDetailApi extends VoiceCallSummaryApi {
   transcript: TranscriptTurnApi[];
 }
 
+export type StatsRange = 'today' | 'week' | 'month';
+
+export interface StatsApi {
+  range: StatsRange;
+  outNow: number;
+  overdueNow: number;
+  totalIssued: number;
+  returnedInWindow: number;
+  avgDurationSeconds: number;
+}
+
 export interface AlertSummaryApi {
   id: string;
   studentId: string;

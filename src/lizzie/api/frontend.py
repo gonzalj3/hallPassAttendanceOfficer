@@ -18,7 +18,7 @@ Routes (all prefixed `/api`):
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -45,6 +45,8 @@ from lizzie.schemas.frontend import (
     HallPassStatusLiteral,
     IssueHallPassIn,
     RosterOut,
+    StatsOut,
+    StatsRangeLiteral,
     StudentOut,
 )
 from lizzie.services.audit import write_audit
@@ -428,6 +430,93 @@ async def list_alerts(
             )
         )
     return out
+
+
+# ---------- stats ----------
+
+
+def _window_for(range_: StatsRangeLiteral, now: datetime) -> tuple[datetime, datetime]:
+    """Return (start, end) UTC bounds for the dashboard's date filter.
+
+    Today = UTC midnight to now. Week = 7 days back. Month = 30 days
+    back. Calendar months are deliberately not used: a school metric
+    "this month" three days into May would show a misleadingly small
+    number, and a 30-day window is more useful for trend reading.
+    """
+    if range_ == "today":
+        start = datetime.combine(now.date(), time.min, tzinfo=UTC)
+    elif range_ == "week":
+        start = now - timedelta(days=7)
+    else:
+        start = now - timedelta(days=30)
+    return start, now
+
+
+@router.get("/stats", response_model=StatsOut, response_model_by_alias=True)
+async def get_stats(db: SessionDep, range: StatsRangeLiteral = "today") -> StatsOut:
+    """Headline KPIs for the principal dashboard.
+
+    `outNow` / `overdueNow` are point-in-time and ignore `range`.
+    `totalIssued` / `returnedInWindow` / `avgDurationSeconds` honor it.
+    """
+    now = datetime.now(tz=UTC)
+    start, end = _window_for(range, now)
+
+    out_now = int(
+        (
+            await db.execute(select(func.count(HallPass.id)).where(HallPass.status == "ACTIVE"))
+        ).scalar_one()
+    )
+    overdue_now = int(
+        (
+            await db.execute(select(func.count(HallPass.id)).where(HallPass.status == "OVERDUE"))
+        ).scalar_one()
+    )
+    total_issued = int(
+        (
+            await db.execute(
+                select(func.count(HallPass.id)).where(
+                    HallPass.checked_out_at >= start,
+                    HallPass.checked_out_at < end,
+                )
+            )
+        ).scalar_one()
+    )
+    returned_in_window = int(
+        (
+            await db.execute(
+                select(func.count(HallPass.id)).where(
+                    HallPass.checked_in_at.is_not(None),
+                    HallPass.checked_in_at >= start,
+                    HallPass.checked_in_at < end,
+                    HallPass.status.in_(("RETURNED", "FLAGGED")),
+                )
+            )
+        ).scalar_one()
+    )
+
+    avg_seconds_raw = (
+        await db.execute(
+            select(
+                func.avg(func.extract("epoch", HallPass.checked_in_at - HallPass.checked_out_at))
+            ).where(
+                HallPass.checked_in_at.is_not(None),
+                HallPass.checked_in_at >= start,
+                HallPass.checked_in_at < end,
+                HallPass.status.in_(("RETURNED", "FLAGGED")),
+            )
+        )
+    ).scalar_one_or_none()
+    avg_duration_seconds = int(avg_seconds_raw or 0)
+
+    return StatsOut(
+        range=range,
+        out_now=out_now,
+        overdue_now=overdue_now,
+        total_issued=total_issued,
+        returned_in_window=returned_in_window,
+        avg_duration_seconds=avg_duration_seconds,
+    )
 
 
 # ---------- mount helper ----------

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  mockKpis,
   mockTopStudents,
   mockClassroomVolume,
   mockHourlyToday,
@@ -25,6 +24,8 @@ import { getVoiceCall } from '../api/client';
 
 type DateRange = 'today' | 'week' | 'month';
 
+import type { StatsApi } from '../api/types';
+
 const SECTION_KEYS = [
   'overview',
   'live_rosters',
@@ -47,12 +48,6 @@ const RANGE_MULTIPLIER: Record<DateRange, number> = {
   month: 22,
 };
 
-const RANGE_AVG_DURATION: Record<DateRange, number> = {
-  today: mockKpis.avgDurationSeconds,
-  week: 298,
-  month: 311,
-};
-
 type Kpis = {
   outNow: number;
   totalLabel: string;
@@ -60,26 +55,31 @@ type Kpis = {
   activeFlags: number;
   avgDurationSeconds: number;
   lockdowns: number;
-  absent: number;
+  returned: number;
 };
 
-const kpisFor = (range: DateRange, flaggedNow: number): Kpis => {
-  const m = RANGE_MULTIPLIER[range];
-  return {
-    outNow: mockKpis.outNow,
-    totalLabel:
-      range === 'today'
-        ? 'Today Total'
-        : range === 'week'
-          ? 'Week Total'
-          : 'Month Total',
-    total: mockKpis.todayTotal * m,
-    activeFlags: range === 'today' ? flaggedNow : range === 'week' ? 11 : 38,
-    avgDurationSeconds: RANGE_AVG_DURATION[range],
-    lockdowns: range === 'month' ? 1 : 0,
-    absent: range === 'today' ? mockKpis.absent : range === 'week' ? 45 : 120,
-  };
+const TOTAL_LABEL: Record<DateRange, string> = {
+  today: 'Today Total',
+  week: 'Week Total',
+  month: 'Month Total',
 };
+
+// All five visible KPIs now read from the /api/stats endpoint via
+// `data.stats`. mockKpis / RANGE_MULTIPLIER / RANGE_AVG_DURATION are
+// gone -- the data is real.
+const kpisFor = (
+  range: DateRange,
+  stats: StatsApi | null,
+  outNowFallback: number,
+): Kpis => ({
+  outNow: stats?.outNow ?? outNowFallback,
+  totalLabel: TOTAL_LABEL[range],
+  total: stats?.totalIssued ?? 0,
+  activeFlags: stats?.overdueNow ?? 0,
+  avgDurationSeconds: stats?.avgDurationSeconds ?? 0,
+  lockdowns: 0,
+  returned: stats?.returnedInWindow ?? 0,
+});
 
 const classroomVolumeFor = (range: DateRange): ClassroomVolume[] => {
   const m = RANGE_MULTIPLIER[range];
@@ -110,7 +110,7 @@ export default function AdminDashboard() {
 
   // Live data from the ABE backend. Replaces every mockActivePasses /
   // mockClassRosters / mockOutOfClass usage; voice calls + alerts are new.
-  const data = useDashboardData();
+  const data = useDashboardData(range);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -130,12 +130,10 @@ export default function AdminDashboard() {
     FAVICON_BADGE_PREVIEW !== null ? FAVICON_BADGE_PREVIEW : flaggedNow,
   );
 
-  const kpis = useMemo(() => {
-    const base = kpisFor(range, flaggedNow);
-    return range === 'today'
-      ? { ...base, outNow: data.outOfClass.length }
-      : base;
-  }, [range, flaggedNow, data.outOfClass.length]);
+  const kpis = useMemo(
+    () => kpisFor(range, data.stats, data.outOfClass.length),
+    [range, data.stats, data.outOfClass.length],
+  );
   const classroomVolume = useMemo(() => classroomVolumeFor(range), [range]);
   const topStudents = useMemo(() => topStudentsFor(range), [range]);
 
@@ -346,7 +344,7 @@ function TopBar({
 
 function KpiStrip({ kpis }: { kpis: Kpis }) {
   const tiles = [
-    { label: 'Absent', value: String(kpis.absent) },
+    { label: 'Returned', value: String(kpis.returned) },
     { label: 'Out Now', value: String(kpis.outNow) },
     { label: kpis.totalLabel, value: String(kpis.total) },
     {

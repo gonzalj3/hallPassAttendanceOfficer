@@ -81,6 +81,22 @@ class IssueHallPassIn(_CamelBase):
     )
 
 
+StatsRangeLiteral = Literal["today", "week", "month"]
+
+
+class StatsOut(_CamelBase):
+    """Dashboard headline KPIs. Snapshot metrics (`outNow`, `overdueNow`)
+    always reflect right-now; window metrics honor the `range` query
+    parameter."""
+
+    range: StatsRangeLiteral
+    out_now: int = Field(serialization_alias="outNow")
+    overdue_now: int = Field(serialization_alias="overdueNow")
+    total_issued: int = Field(serialization_alias="totalIssued")
+    returned_in_window: int = Field(serialization_alias="returnedInWindow")
+    avg_duration_seconds: int = Field(serialization_alias="avgDurationSeconds")
+
+
 class AlertSummaryOut(_CamelBase):
     id: UUID
     student_id: UUID = Field(serialization_alias="studentId")

@@ -5,6 +5,8 @@ import type {
   ClassPeriodApi,
   HallPassApi,
   RosterApi,
+  StatsApi,
+  StatsRange,
   VoiceCallDetailApi,
   VoiceCallSummaryApi,
 } from './types';
@@ -45,6 +47,10 @@ export async function getRoster(sessionId: string): Promise<RosterApi> {
 
 export async function listActivePasses(): Promise<HallPassApi[]> {
   return request<HallPassApi[]>('/api/hall-passes?status_filter=ACTIVE');
+}
+
+export async function getStats(range: StatsRange = 'today'): Promise<StatsApi> {
+  return request<StatsApi>(`/api/stats?range=${range}`);
 }
 
 export async function listAlerts(opts?: {

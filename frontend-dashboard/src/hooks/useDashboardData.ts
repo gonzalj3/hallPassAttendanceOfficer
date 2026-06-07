@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { listActivePasses, listAlerts, listVoiceCalls, getRoster, listSessions, ApiError } from '../api/client';
+import { listActivePasses, listAlerts, listVoiceCalls, getRoster, getStats, listSessions, ApiError } from '../api/client';
 import { useRealtime } from '../api/realtime';
 import type {
   AlertSummaryApi,
@@ -12,6 +12,8 @@ import type {
   HallPassApi,
   RealtimeEnvelope,
   RosterApi,
+  StatsApi,
+  StatsRange,
   VoiceCallSummaryApi,
 } from '../api/types';
 import type {
@@ -104,28 +106,31 @@ export interface DashboardData {
   outOfClass: OutOfClassEntry[];
   voiceCalls: VoiceCallSummaryApi[];
   alerts: AlertSummaryApi[];
+  stats: StatsApi | null;
   /** All distinct schoolIds the data references — used to set up WS channels. */
   schoolIds: string[];
   refresh: () => void;
 }
 
-export function useDashboardData(): DashboardData {
+export function useDashboardData(range: StatsRange = 'today'): DashboardData {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activePasses, setActivePasses] = useState<ActivePass[]>([]);
   const [classRosters, setClassRosters] = useState<ClassRoster[]>([]);
   const [voiceCalls, setVoiceCalls] = useState<VoiceCallSummaryApi[]>([]);
   const [alerts, setAlerts] = useState<AlertSummaryApi[]>([]);
+  const [stats, setStats] = useState<StatsApi | null>(null);
   const [schoolIds, setSchoolIds] = useState<string[]>([]);
 
   const fetchAll = useCallback(async () => {
     try {
       setError(null);
-      const [sessions, passes, calls, alertsList] = await Promise.all([
+      const [sessions, passes, calls, alertsList, statsResult] = await Promise.all([
         listSessions(),
         listActivePasses(),
         listVoiceCalls({ limit: 25 }),
         listAlerts({ limit: 50 }),
+        getStats(range),
       ]);
 
       // Hydrate per-session rosters in parallel.
@@ -134,6 +139,7 @@ export function useDashboardData(): DashboardData {
       setActivePasses(passes.map(passToActive));
       setVoiceCalls(calls);
       setAlerts(alertsList);
+      setStats(statsResult);
       setSchoolIds(Array.from(new Set(sessions.map((s) => s.schoolId))));
     } catch (e: unknown) {
       const msg = e instanceof ApiError ? `${e.status} ${e.message}` : (e as Error).message;
@@ -141,7 +147,7 @@ export function useDashboardData(): DashboardData {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => {
     void fetchAll();
@@ -198,6 +204,7 @@ export function useDashboardData(): DashboardData {
     outOfClass,
     voiceCalls,
     alerts,
+    stats,
     schoolIds,
     refresh: fetchAll,
   };
