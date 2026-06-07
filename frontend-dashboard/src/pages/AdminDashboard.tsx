@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  mockTopStudents,
-  mockClassroomVolume,
-  mockHourlyToday,
-  mockHourlyAvg,
-  hourLabels,
   type ActivePass,
-  type ClassroomVolume,
-  type TopStudent,
   type OutLocation,
   type ClassRoster,
   type OutOfClassEntry,
@@ -42,12 +35,6 @@ const formatElapsed = (s: number) =>
 const elapsedSec = (iso: string, now: number) =>
   Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
 
-const RANGE_MULTIPLIER: Record<DateRange, number> = {
-  today: 1,
-  week: 5,
-  month: 22,
-};
-
 type Kpis = {
   outNow: number;
   totalLabel: string;
@@ -80,16 +67,6 @@ const kpisFor = (
   lockdowns: 0,
   returned: stats?.returnedInWindow ?? 0,
 });
-
-const classroomVolumeFor = (range: DateRange): ClassroomVolume[] => {
-  const m = RANGE_MULTIPLIER[range];
-  return mockClassroomVolume.map(c => ({ ...c, passCount: c.passCount * m }));
-};
-
-const topStudentsFor = (range: DateRange): TopStudent[] => {
-  const m = RANGE_MULTIPLIER[range];
-  return mockTopStudents.map(s => ({ ...s, passCount: s.passCount * m }));
-};
 
 const OUT_LOCATIONS: OutLocation[] = ['Restroom', 'Nurse', 'Office', 'Hallway'];
 
@@ -124,19 +101,12 @@ export default function AdminDashboard() {
       ).length,
     [now, data.activePasses],
   );
-  /** Set to a number to preview the tab favicon badge; set back to `null` for live overdue count. */
-  const FAVICON_BADGE_PREVIEW: number | null = 3;
-  useFaviconBadge(
-    FAVICON_BADGE_PREVIEW !== null ? FAVICON_BADGE_PREVIEW : flaggedNow,
-  );
+  useFaviconBadge(flaggedNow);
 
   const kpis = useMemo(
     () => kpisFor(range, data.stats, data.outOfClass.length),
     [range, data.stats, data.outOfClass.length],
   );
-  const classroomVolume = useMemo(() => classroomVolumeFor(range), [range]);
-  const topStudents = useMemo(() => topStudentsFor(range), [range]);
-
   const showRangeFilter = section === 'overview';
 
   return (
@@ -168,9 +138,6 @@ export default function AdminDashboard() {
                 now={now}
                 onViewAll={() => setSection('live_activity')}
               />
-              <ClassroomVolumeCard volume={classroomVolume} range={range} />
-              <HourlyChartCard range={range} />
-              <FrequentFlyersCard students={topStudents} range={range} />
             </div>
           </>
         )}
@@ -451,170 +418,6 @@ function LiveActivityCard({
           ? `View all ${passes.length} active passes →`
           : 'View full activity log →'}
       </button>
-    </div>
-  );
-}
-
-function ClassroomVolumeCard({
-  volume,
-  range,
-}: {
-  volume: ClassroomVolume[];
-  range: DateRange;
-}) {
-  const max = Math.max(...volume.map(c => c.passCount));
-  const colorAt = (i: number) =>
-    i <= 1 ? 'bg-[#00666e]' : i <= 3 ? 'bg-[#00818a]' : 'bg-[#63d7e2]';
-
-  const RANGE_LABEL: Record<DateRange, string> = {
-    today: 'today',
-    week: 'this week',
-    month: 'this month',
-  };
-
-  return (
-    <div className="col-span-5 bg-white rounded-xl p-5 shadow-sm">
-      <div className="flex items-end justify-between mb-4">
-        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
-          Volume by classroom
-        </h3>
-        <span className="text-xs text-[#6d797b]">{RANGE_LABEL[range]}</span>
-      </div>
-      <div className="space-y-3 text-sm">
-        {volume.map((c, i) => {
-          const lastName = c.teacherName.split(' ').slice(-1)[0];
-          const room = c.room.replace('Rm ', '');
-          const widthPct = (c.passCount / max) * 100;
-          return (
-            <div key={c.id}>
-              <div className="flex justify-between mb-1">
-                <span>
-                  {lastName} · {room}
-                </span>
-                <span className="font-['Lexend',sans-serif] font-bold tracking-tight">
-                  {c.passCount}
-                </span>
-              </div>
-              <div className="h-2 bg-[#eff5f5] rounded-full">
-                <div
-                  className={`h-full rounded-full ${colorAt(i)}`}
-                  style={{ width: `${widthPct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function HourlyChartCard({ range }: { range: DateRange }) {
-  const W = 700;
-  const H = 180;
-  const padX = 30;
-
-  const m = RANGE_MULTIPLIER[range];
-  const today = useMemo(() => mockHourlyToday.map(v => v * m), [m]);
-  const avg = useMemo(() => mockHourlyAvg.map(v => v * m), [m]);
-
-  const max = Math.max(...today, ...avg);
-  const xStep = (W - padX * 2) / (today.length - 1);
-  const x = (i: number) => padX + i * xStep;
-  const y = (v: number) => 30 + (1 - v / max) * (H - 60);
-  const todayMax = Math.max(...today);
-
-  const linePath = avg
-    .map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`)
-    .join(' ');
-
-  const subtitle =
-    range === 'today'
-      ? 'Bar: today · Line: 7-day avg'
-      : range === 'week'
-        ? 'Bar: this week · Line: 7-day avg'
-        : 'Bar: this month · Line: 7-day avg';
-
-  return (
-    <div className="col-span-8 bg-white rounded-xl p-5 shadow-sm">
-      <div className="flex items-end justify-between mb-3">
-        <h3 className="font-['Lexend',sans-serif] font-semibold text-base">
-          Movement by hour
-        </h3>
-        <span className="text-xs text-[#6d797b]">{subtitle}</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-48">
-        <g stroke="#eff5f5" strokeWidth="1">
-          <line x1={padX} y1={30} x2={W - padX} y2={30} />
-          <line x1={padX} y1={90} x2={W - padX} y2={90} />
-          <line x1={padX} y1={150} x2={W - padX} y2={150} />
-        </g>
-        <g>
-          {today.map((v, i) => {
-            const barY = y(v);
-            const barH = 150 - barY;
-            const fill = v === todayMax ? '#00666e' : '#00818a';
-            return (
-              <rect
-                key={i}
-                x={x(i) - 18}
-                y={barY}
-                width={36}
-                height={barH}
-                fill={fill}
-              />
-            );
-          })}
-        </g>
-        <path
-          d={linePath}
-          fill="none"
-          stroke="#ba1a1a"
-          strokeWidth="2"
-          strokeDasharray="4,4"
-        />
-        <g fontSize="10" fill="#6d797b">
-          {hourLabels.map((label, i) => (
-            <text key={label} x={x(i) - 8} y={172}>
-              {label}
-            </text>
-          ))}
-        </g>
-      </svg>
-    </div>
-  );
-}
-
-function FrequentFlyersCard({
-  students,
-  range,
-}: {
-  students: TopStudent[];
-  range: DateRange;
-}) {
-  const TITLE: Record<DateRange, string> = {
-    today: 'Frequent flyers (today)',
-    week: 'Frequent flyers (week)',
-    month: 'Frequent flyers (month)',
-  };
-
-  return (
-    <div className="col-span-4 bg-white rounded-xl p-5 shadow-sm">
-      <h3 className="font-['Lexend',sans-serif] font-semibold text-base mb-4">
-        {TITLE[range]}
-      </h3>
-      <table className="w-full text-sm">
-        <tbody className="divide-y divide-[#eff5f5]">
-          {students.map(s => (
-            <tr key={s.id}>
-              <td className="py-2 font-semibold">{s.name}</td>
-              <td className="py-2 text-right font-['Lexend',sans-serif] font-bold">
-                {s.passCount}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
