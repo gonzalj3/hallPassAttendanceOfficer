@@ -15,6 +15,7 @@ import {
 } from '../data/mockAdmin';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useFaviconBadge } from '../hooks/useFaviconBadge';
+import { useHashSection } from '../hooks/useHashSection';
 import type {
   AlertSummaryApi,
   TranscriptTurnApi,
@@ -24,12 +25,15 @@ import { getVoiceCall } from '../api/client';
 
 type DateRange = 'today' | 'week' | 'month';
 
-type SectionKey =
-  | 'overview'
-  | 'live_rosters'
-  | 'live_activity'
-  | 'attendance'
-  | 'alerts';
+const SECTION_KEYS = [
+  'overview',
+  'live_rosters',
+  'live_activity',
+  'attendance',
+  'alerts',
+] as const;
+
+type SectionKey = (typeof SECTION_KEYS)[number];
 
 const formatElapsed = (s: number) =>
   `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -99,7 +103,9 @@ const SECTION_TITLES: Record<SectionKey, string> = {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<DateRange>('today');
-  const [section, setSection] = useState<SectionKey>('overview');
+  // Mirror `section` to the URL hash so a refresh stays on the same
+  // view and browser back/forward navigates between sections.
+  const [section, setSection] = useHashSection<SectionKey>('overview', SECTION_KEYS);
   const [now, setNow] = useState(Date.now());
 
   // Live data from the ABE backend. Replaces every mockActivePasses /
