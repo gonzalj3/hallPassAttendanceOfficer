@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -15,7 +15,8 @@ pytestmark = pytest.mark.integration
 async def test_seed_adds_today_sessions_when_demo_school_already_exists(
     async_session: AsyncSession,
 ) -> None:
-    yesterday = date.today() - timedelta(days=1)
+    today_utc = datetime.now(tz=UTC).date()
+    yesterday = today_utc - timedelta(days=1)
 
     school = School(name=SCHOOL_NAME)
     async_session.add(school)
@@ -69,7 +70,7 @@ async def test_seed_adds_today_sessions_when_demo_school_already_exists(
     await seed(async_session)
 
     today_sessions = (
-        (await async_session.execute(select(ClassSession).where(ClassSession.date == date.today())))
+        (await async_session.execute(select(ClassSession).where(ClassSession.date == today_utc)))
         .scalars()
         .all()
     )

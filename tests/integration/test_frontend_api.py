@@ -12,7 +12,7 @@ outer-transaction rollback cleans up between tests.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import date, time, timedelta
+from datetime import time, timedelta
 from uuid import uuid4
 
 import httpx
@@ -72,7 +72,10 @@ async def _seed_school(async_session: AsyncSession) -> dict[str, object]:
     Flushes only — caller's outer transaction owns the commit/rollback so
     test isolation is preserved.
     """
-    today = date.today()
+    from datetime import UTC
+    from datetime import datetime as _dt
+
+    today = _dt.now(tz=UTC).date()
 
     school = School(name="Test High")
     async_session.add(school)

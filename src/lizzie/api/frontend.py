@@ -18,7 +18,7 @@ Routes (all prefixed `/api`):
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
@@ -169,7 +169,11 @@ async def _session_to_period(
 
 
 def _today_local() -> tuple[date, time]:
-    now = datetime.now()
+    # Use UTC explicitly. datetime.now() is naive and depends on the
+    # container's TZ env (Railway is UTC, a dev's laptop is not), so
+    # the seed and this query could end up disagreeing about "today"
+    # whenever the laptop crosses a date boundary the server hasn't.
+    now = datetime.now(tz=UTC)
     return now.date(), now.time()
 
 

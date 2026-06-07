@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -91,7 +91,11 @@ async def seed(db: AsyncSession) -> dict[str, UUID]:
         await db.execute(select(School).where(School.name == SCHOOL_NAME))
     ).scalar_one_or_none()
 
-    today = date.today()
+    # Pin to UTC so the seed and the /api/sessions query agree on
+    # "today" regardless of where this CLI is invoked from. A laptop in
+    # CDT seeding the Railway DB after UTC midnight would otherwise
+    # create sessions for "yesterday" from the backend's perspective.
+    today = datetime.now(tz=UTC).date()
 
     if school is None:
         school = School(name=SCHOOL_NAME, district=SCHOOL_DISTRICT)

@@ -171,7 +171,7 @@ export function ClassSelectPage() {
         {sessions && sessions.length === 0 && !error && (
           <div className="text-center text-gray-500 text-sm">
             No class sessions scheduled for today. Run{' '}
-            <code className="bg-gray-100 px-1.5 py-0.5 rounded">python -m hpao.cli.seed</code>{' '}
+            <code className="bg-gray-100 px-1.5 py-0.5 rounded">python -m lizzie.cli.seed</code>{' '}
             to populate demo data.
           </div>
         )}
